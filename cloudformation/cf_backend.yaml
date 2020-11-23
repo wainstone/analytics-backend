@@ -30,7 +30,7 @@ Resources:
     Type: AWS::ApiGateway::RestApi
     Properties: 
       # ApiKeySourceType: String (will need this eventually)
-      Description: "Rest API for our 391 project"
+      Description: "Rest API for Athlytics Capstone Project"
       EndpointConfiguration: 
           Types: 
           - EDGE
