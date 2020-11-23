@@ -37,6 +37,31 @@ Resources:
       Name: 
           Fn::Sub: "${ProjectName}_api"
   
+  apiGatewayDeployment:
+    Type: "AWS::ApiGateway::Deployment"
+    DependsOn:
+      - apiResource
+      - apiMethod
+    Properties:
+      RestApiId: 
+        Ref: apiGateway
+
+  apiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties: 
+      DeploymentId:
+        Ref: apiGatewayDeployment
+      RestApiId: 
+        Ref: apiGateway
+      StageName:
+        Ref: Environment
+      Description:
+        Fn::Sub: "Deployment stage for ${Environment} environment."
+      MethodSettings: 
+        - ResourcePath: /athletes
+          HttpMethod: GET
+          MetricsEnabled: "true"
+
   # Initial testing route, eventually will add multiple routes for the different backend requests
   apiResource:
     Type: AWS::ApiGateway::Resource
@@ -46,7 +71,6 @@ Resources:
       PathPart: athletes
       RestApiId:
         Ref: apiGateway
-
 
   apiMethod:
     Type: AWS::ApiGateway::Method
@@ -66,15 +90,6 @@ Resources:
       RestApiId:
         Ref: apiGateway
 
-  apiGatewayDeployment:
-    Type: "AWS::ApiGateway::Deployment"
-    DependsOn:
-      - apiMethod
-    Properties:
-      RestApiId: 
-        Ref: apiGateway
-      StageName: 
-        Fn::Sub: ${Environment}
 
   lambdaApiGatewayInvoke:
     Type: "AWS::Lambda::Permission"
@@ -145,9 +160,6 @@ Resources:
                   headers,
               };
           };
-
-
-      Description: "The Lambda function to handle our backend logic."
       FunctionName: 
         Ref: LambdaName
       Handler: "index.handler"
@@ -202,8 +214,8 @@ Resources:
         Ref: TableName
 
 
-Outputs:
-  APIInvokeURL:
-    Description: The url for our project to hit.
-    Value: 
-      Fn::Sub: "https://${apiGateway}.execute-api.${Region}.amazonaws.com/call/"
+# Outputs:
+#   APIInvokeURL:
+#     Description: The url for our project to hit.
+#     Value: 
+#       Fn::Sub: "https://${apiGateway}.execute-api.${Region}.amazonaws.com/call/"
