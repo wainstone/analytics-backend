@@ -38,6 +38,16 @@ Resources:
           Fn::Sub: "${ProjectName}_api"
   
   # Initial testing route, eventually will add multiple routes for the different backend requests
+  apiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties: 
+      ParentId: 
+        Fn::GetAtt: [apiGateway, RootResourceId]
+      PathPart: athletes
+      RestApiId:
+        Ref: apiGateway
+
+
   apiMethod:
     Type: AWS::ApiGateway::Method
     Properties:
@@ -45,14 +55,14 @@ Resources:
       AuthorizationType: NONE
       HttpMethod: GET
       Integration: 
-        IntegrationHttpMethod: GET
+        IntegrationHttpMethod: POST
         Type: AWS_PROXY
         Uri: 
           Fn::Sub: "arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:${LambdaName}/invocations"
       OperationName: 
         Ref: LambdaName
-      ResourceId: 
-        Fn::GetAtt: [apiGateway, RootResourceId]
+      ResourceId:
+        Ref: apiResource
       RestApiId:
         Ref: apiGateway
 
@@ -76,7 +86,7 @@ Resources:
         Fn::Sub: arn:aws:lambda:${Region}:${AccountId}:function:${LambdaName} # [lambdaFunction, Arn]
       Principal: apigateway.amazonaws.com
       SourceArn:
-        Fn::Sub: "arn:aws:execute-api:${Region}:${AccountId}:${apiGateway}/*/GET/"
+        Fn::Sub: "arn:aws:execute-api:${Region}:${AccountId}:${apiGateway}/*"
 
   lambdaFunction:
     Type: AWS::Lambda::Function
