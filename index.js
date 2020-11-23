@@ -14,6 +14,7 @@ const dynamo = new AWS.DynamoDB.DocumentClient();
  */
 exports.handler = async (event, context) => {
     let body;
+    console.log('from github');
     let statusCode = '200';
     const headers = {
         'Content-Type': 'application/json',
