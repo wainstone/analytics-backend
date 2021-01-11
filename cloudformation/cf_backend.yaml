@@ -21,7 +21,7 @@ Parameters:
 
   Environment:
     Type: String
-    Default: "dev"
+    Default: "prod"
 
 Resources:
   # Need: API gateway, API gateway method, maybe need API gateway resource, labmda function, dynamodb table
@@ -161,7 +161,7 @@ Resources:
               };
           };
       FunctionName: 
-        Ref: LambdaName
+        Fn::Sub: "${LambdaName}-${Environment}"
       Handler: "index.handler"
       Role:
         Fn::Sub: "arn:aws:iam::${AccountId}:role/service-role/infra-test-reply-message-role-ygzuoc99"
@@ -211,7 +211,7 @@ Resources:
         - AttributeName: "Athlete"
           KeyType: HASH
       TableName:
-        Ref: TableName
+        Fn::Sub: "${TableName}-${Environment}"
 
 
 # Outputs:
