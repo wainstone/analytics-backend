@@ -2,6 +2,8 @@ const AWS = require('aws-sdk');
 
 const dynamo = new AWS.DynamoDB.DocumentClient();
 
+// const router = require('./router');
+
 /**
  * Demonstrates a simple HTTP endpoint using API Gateway. You have full
  * access to the request and response payload, including headers and
@@ -14,7 +16,7 @@ const dynamo = new AWS.DynamoDB.DocumentClient();
  */
 exports.handler = async (event, context) => {
     let body;
-    console.log('from github');
+    console.log('wain-wain');
     let statusCode = '200';
     const headers = {
         'Content-Type': 'application/json',
@@ -28,7 +30,7 @@ exports.handler = async (event, context) => {
                 body = await dynamo.delete(JSON.parse(event.body)).promise();
                 break;
             case 'GET':
-                body = await dynamo.scan({ TableName: event.queryStringParameters.TableName }).promise();
+                body = dynamo.scan({ TableName: event.queryStringParameters.TableName }).promise();
                 break;
             case 'POST':
                 body = await dynamo.put(JSON.parse(event.body)).promise();
@@ -45,9 +47,5 @@ exports.handler = async (event, context) => {
     } finally {
         body = JSON.stringify(body);
     }
-    return {
-        statusCode,
-        body,
-        headers,
-    };
+    return body;
 };
