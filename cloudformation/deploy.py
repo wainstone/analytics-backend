@@ -44,18 +44,9 @@ def buildLambda():
 
     with open(template, "r") as yamlfile:
         template_string = yamlfile.read()
-        print(template_string)
         template = Template(template_string)
         rendered = template.render(lambda_properties)
-        print(rendered)
-
-    with open(new_rendered, "w") as output:
-        output.write(rendered)
-
-    with open(new_rendered, 'r') as output:
-        new_yaml = yaml.safe_load(output)
-        appendLambda(new_yaml)
-
+        appendLambda(yaml.safe_load(rendered))
     
 
 # appendLambdas will append the rendered lambda cloudformation files to the actual backend template 
@@ -104,9 +95,9 @@ def main():
     parameters = [
                 {"ParameterKey": "Environment", "ParameterValue": args.env},
                 {"ParameterKey": "ApiReadyToDeploy", "ParameterValue": "false"}]
-
     deployStack(cf_client, stack_name, templateBody, parameters)
 
+    print("Lambda functions created, now deploying with respective API methods.")
     parameters[1]["ParameterValue"] = "true"
     deployStack(cf_client, stack_name, templateBody, parameters)
 
