@@ -1,221 +1,152 @@
+Conditions:
+  DeployApi:
+    Fn::Equals:
+    - Ref: ApiReadyToDeploy
+    - 'true'
 Parameters:
-  Region:
-    Type: String 
-    Default: "ca-central-1" 
-
   AccountId:
-    Type: String 
-    Default: "495679467660"
-
-  LambdaName: 
-    Type: String 
-    Default: "get_all_athletes"
-
-  TableName:
-    Type: String 
-    Default: "athlytics_jy75"
-
-  ProjectName:
+    Default: '495679467660'
     Type: String
-    Default: "athlytics_jy75"
-
+  ApiReadyToDeploy:
+    AllowedValues:
+    - 'true'
+    - 'false'
+    Description: Specifies if the lambda functions are created such that the API can
+      be deployed.
+    Type: String
   Environment:
+    Default: dev
     Type: String
-    Default: "prod"
-
+  LambdaName:
+    Default: get_all_athletes
+    Type: String
+  ProjectName:
+    Default: athlytics_jy75
+    Type: String
+  Region:
+    Default: ca-central-1
+    Type: String
+  TableName:
+    Default: athlytics_jy75
+    Type: String
 Resources:
-  # Need: API gateway, API gateway method, maybe need API gateway resource, labmda function, dynamodb table
-
   apiGateway:
-    Type: AWS::ApiGateway::RestApi
-    Properties: 
-      # ApiKeySourceType: String (will need this eventually)
-      Description: "Rest API for Athlytics Capstone Project"
-      EndpointConfiguration: 
-          Types: 
-          - EDGE
-      Name: 
-          Fn::Sub: "${ProjectName}_api"
-  
-  apiGatewayDeployment:
-    Type: "AWS::ApiGateway::Deployment"
-    DependsOn:
-      - apiResource
-      - apiMethod
     Properties:
-      RestApiId: 
+      Description: Rest API for Athlytics Capstone Project
+      EndpointConfiguration:
+        Types:
+        - EDGE
+      Name:
+        Fn::Sub: ${ProjectName}_api
+    Type: AWS::ApiGateway::RestApi
+  apiGatewayDeployment:
+    Condition: DeployApi
+    DependsOn:
+    - apiResource
+    Properties:
+      RestApiId:
         Ref: apiGateway
-
+    Type: AWS::ApiGateway::Deployment
   apiGatewayStage:
-    Type: AWS::ApiGateway::Stage
-    Properties: 
+    Condition: DeployApi
+    DependsOn:
+    - apiResource
+    Properties:
       DeploymentId:
         Ref: apiGatewayDeployment
-      RestApiId: 
+      Description:
+        Fn::Sub: Deployment stage for ${Environment} environment.
+      MethodSettings:
+      - HttpMethod: POST
+        MetricsEnabled: 'true'
+        ResourcePath: /athletes
+      RestApiId:
         Ref: apiGateway
       StageName:
         Ref: Environment
-      Description:
-        Fn::Sub: "Deployment stage for ${Environment} environment."
-      MethodSettings: 
-        - ResourcePath: /athletes
-          HttpMethod: GET
-          MetricsEnabled: "true"
-
-  # Initial testing route, eventually will add multiple routes for the different backend requests
+    Type: AWS::ApiGateway::Stage
   apiResource:
-    Type: AWS::ApiGateway::Resource
-    Properties: 
-      ParentId: 
-        Fn::GetAtt: [apiGateway, RootResourceId]
+    DependsOn:
+    - apiGateway
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+        - apiGateway
+        - RootResourceId
       PathPart: athletes
       RestApiId:
         Ref: apiGateway
-
-  apiMethod:
-    Type: AWS::ApiGateway::Method
+    Type: AWS::ApiGateway::Resource
+  dynamodbTable:
     Properties:
-      ApiKeyRequired: False
+      AttributeDefinitions:
+      - AttributeName: Athlete
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: Athlete
+        KeyType: HASH
+      TableName:
+        Fn::Sub: ${TableName}-${Environment}
+    Type: AWS::DynamoDB::Table
+  functionOneApiGatewayInvoke:
+    DependsOn:
+    - functionOneLambdaFunction
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::Sub: arn:aws:lambda:${Region}:${AccountId}:function:functionOne-${Environment}
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${Region}:${AccountId}:${apiGateway}/*
+    Type: AWS::Lambda::Permission
+  functionOneApiMethod:
+    Properties:
+      ApiKeyRequired: false
       AuthorizationType: NONE
-      HttpMethod: GET
-      Integration: 
+      HttpMethod: POST
+      Integration:
         IntegrationHttpMethod: POST
         Type: AWS_PROXY
-        Uri: 
-          Fn::Sub: "arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:${LambdaName}/invocations"
-      OperationName: 
-        Ref: LambdaName
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:functionOne/invocations
+      OperationName: functionOne
       ResourceId:
         Ref: apiResource
       RestApiId:
         Ref: apiGateway
-
-
-  lambdaApiGatewayInvoke:
-    Type: "AWS::Lambda::Permission"
-    DependsOn:
-      - lambdaFunction
+    Type: AWS::ApiGateway::Method
+  functionOneLambdaFunction:
     Properties:
-      Action: "lambda:InvokeFunction"
-      FunctionName: 
-        Fn::Sub: arn:aws:lambda:${Region}:${AccountId}:function:${LambdaName} # [lambdaFunction, Arn]
-      Principal: apigateway.amazonaws.com
-      SourceArn:
-        Fn::Sub: "arn:aws:execute-api:${Region}:${AccountId}:${apiGateway}/*"
-
-  lambdaFunction:
-    Type: AWS::Lambda::Function
-    Properties: 
-      Code: 
-        ZipFile: |
-          const AWS = require('aws-sdk');
-
-          const dynamo = new AWS.DynamoDB.DocumentClient();
-
-          /**
-          * Demonstrates a simple HTTP endpoint using API Gateway. You have full
-          * access to the request and response payload, including headers and
-          * status code.
-          *
-          * To scan a DynamoDB table, make a GET request with the TableName as a
-          * query string parameter. To put, update, or delete an item, make a POST,
-          * PUT, or DELETE request respectively, passing in the payload to the
-          * DynamoDB API as a JSON body.
-          */
-          exports.handler = async (event, context) => {
-              let body;
-              let statusCode = '200';
-              const headers = {
-                  'Content-Type': 'application/json',
-                  "Access-Control-Allow-Origin" : "*", // Required for CORS support to work
-                  "Access-Control-Allow-Credentials" : true // Required for cookies, authorization headers with HTTPS 
-              };
-
-              try {
-                  switch (event.httpMethod) {
-                      case 'DELETE':
-                          body = await dynamo.delete(JSON.parse(event.body)).promise();
-                          break;
-                      case 'GET':
-                          body = await dynamo.scan({ TableName: event.queryStringParameters.TableName }).promise();
-                          break;
-                      case 'POST':
-                          body = await dynamo.put(JSON.parse(event.body)).promise();
-                          break;
-                      case 'PUT':
-                          body = await dynamo.update(JSON.parse(event.body)).promise();
-                          break;
-                      default:
-                          throw new Error(`Unsupported method "${event.httpMethod}"`);
-                  }
-              } catch (err) {
-                  statusCode = '400';
-                  body = err.message;
-              } finally {
-                  body = JSON.stringify(body);
-              }
-              return {
-                  statusCode,
-                  body,
-                  headers,
-              };
-          };
-      FunctionName: 
-        Fn::Sub: "${LambdaName}-${Environment}"
-      Handler: "index.handler"
+      Code:
+        ZipFile: "const AWS = require('aws-sdk');\n\nconst dynamo = new AWS.DynamoDB.DocumentClient();\n\
+          \n/**\n* Demonstrates a simple HTTP endpoint using API Gateway. You have\
+          \ full\n* access to the request and response payload, including headers\
+          \ and\n* status code.\n*\n* To scan a DynamoDB table, make a GET request\
+          \ with the TableName as a\n* query string parameter. To put, update, or\
+          \ delete an item, make a POST,\n* PUT, or DELETE request respectively, passing\
+          \ in the payload to the\n* DynamoDB API as a JSON body.\n*/\nexports.handler\
+          \ = async (event, context) => {\n    let body;\n    let statusCode = '200';\n\
+          \    const headers = {\n        'Content-Type': 'application/json',\n  \
+          \      \"Access-Control-Allow-Origin\" : \"*\", // Required for CORS support\
+          \ to work\n        \"Access-Control-Allow-Credentials\" : true // Required\
+          \ for cookies, authorization headers with HTTPS \n    };\n\n    try {\n\
+          \        switch (event.httpMethod) {\n            case 'DELETE':\n     \
+          \           body = await dynamo.delete(JSON.parse(event.body)).promise();\n\
+          \                break;\n            case 'GET':\n                body =\
+          \ await dynamo.scan({ TableName: event.queryStringParameters.TableName }).promise();\n\
+          \                break;\n            case 'POST':\n                body\
+          \ = await dynamo.put(JSON.parse(event.body)).promise();\n              \
+          \  break;\n            case 'PUT':\n                body = await dynamo.update(JSON.parse(event.body)).promise();\n\
+          \                break;\n            default:\n                throw new\
+          \ Error(`Unsupported method \"${event.httpMethod}\"`);\n        }\n    }\
+          \ catch (err) {\n        statusCode = '400';\n        body = err.message;\n\
+          \    } finally {\n        body = JSON.stringify(body);\n    }\n    return\
+          \ {\n        statusCode,\n        body,\n        headers,\n    };\n};\n"
+      FunctionName:
+        Fn::Sub: functionOne-${Environment}
+      Handler: index.handler
       Role:
-        Fn::Sub: "arn:aws:iam::${AccountId}:role/service-role/infra-test-reply-message-role-ygzuoc99"
+        Fn::Sub: arn:aws:iam::${AccountId}:role/service-role/infra-test-reply-message-role-ygzuoc99
       Runtime: nodejs12.x
-
-
-  # lambdaIAMRole:
-  #   Type: "AWS::IAM::Role"
-  #   Properties:
-  #     AssumeRolePolicyDocument:
-  #       Version: "2012-10-17"
-  #       Statement:
-  #         - Action:
-  #             - "sts:AssumeRole"
-  #           Effect: "Allow"
-  #           Principal:
-  #             Service:
-  #               - "lambda.amazonaws.com"
-  #     Policies:
-  #       - PolicyDocument:
-  #           Version: "2012-10-17"
-  #           Statement:
-  #             - Action:
-  #                 - "logs:CreateLogGroup"
-  #                 - "logs:CreateLogStream"
-  #                 - "logs:PutLogEvents"
-  #               Effect: "Allow"
-  #               Resource:
-  #                 - Fn::Sub: "arn:aws:logs:${Region}:${AccountId}:log-group:/aws/lambda/${LambdaName}:*"
-  #             - Action:
-  #                 - "dynamodb:PutItem"
-  #                 - "dynamodb:GetItem"
-  #               Effect: "Allow"
-  #               Resource:
-  #                 - Fn::Sub: "arn:aws:dynamodb:${Region}:${AccountId}:table/${TableName}"
-  #         PolicyName: 
-  #           Ref: LambdaName
-
-  dynamodbTable:
-    Type: AWS::DynamoDB::Table
-    Properties: 
-      AttributeDefinitions: 
-        - AttributeName: "Athlete"
-          AttributeType: S
-      BillingMode: PAY_PER_REQUEST
-      KeySchema: 
-        - AttributeName: "Athlete"
-          KeyType: HASH
-      TableName:
-        Fn::Sub: "${TableName}-${Environment}"
-
-
-# Outputs:
-#   APIInvokeURL:
-#     Description: The url for our project to hit.
-#     Value: 
-#       Fn::Sub: "https://${apiGateway}.execute-api.${Region}.amazonaws.com/call/"
+    Type: AWS::Lambda::Function
