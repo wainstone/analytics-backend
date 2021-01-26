@@ -107,9 +107,9 @@ Resources:
     Properties:
       ApiKeyRequired: false
       AuthorizationType: NONE
-      HttpMethod: POST
+      HttpMethod: ANY
       Integration:
-        IntegrationHttpMethod: POST
+        IntegrationHttpMethod: ANY
         Type: AWS_PROXY
         Uri:
           Fn::Sub: arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:functionOne-${Environment}/invocations
