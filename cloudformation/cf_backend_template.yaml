@@ -39,7 +39,7 @@ Resources:
         Types:
         - EDGE
       Name:
-        Fn::Sub: ${ProjectName}_api
+        Fn::Sub: ${ProjectName}_api_${Environment}
     Type: AWS::ApiGateway::RestApi
 
   apiGatewayDeployment:

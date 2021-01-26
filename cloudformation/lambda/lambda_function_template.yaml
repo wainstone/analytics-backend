@@ -1,3 +1,29 @@
+{{ lambda_name }}Role:
+  Type: AWS::IAM::Role
+  Properties:
+    RoleName: {{ lambda_name }}Role
+    AssumeRolePolicyDocument:
+      Version: '2012-10-17'
+      Statement:
+      - Effect: Allow
+        Principal:
+          Service:
+          - lambda.amazonaws.com
+        Action:
+        - sts:AssumeRole
+    Path: "/"
+    Policies:
+    - PolicyName: AWSLambdaBasicExecutionRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - logs:CreateLogGroup
+          - logs:CreateLogStream
+          - logs:PutLogEvents
+          Resource: "*"
+
 {{ lambda_name }}ApiMethod:
   Type: AWS::ApiGateway::Method
   Properties:
@@ -8,7 +34,7 @@
       IntegrationHttpMethod: POST
       Type: AWS_PROXY
       Uri: 
-        Fn::Sub: "arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:{{ lambda_name }}/invocations"
+        Fn::Sub: "arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:{{ lambda_name }}-${Environment}/invocations"
     OperationName: {{ lambda_name }}
     ResourceId:
       Ref: apiResource
@@ -18,11 +44,12 @@
 {{ lambda_name }}ApiGatewayInvoke:
   Type: "AWS::Lambda::Permission"
   DependsOn:
+    - apiGateway
     - {{ lambda_name }}LambdaFunction
   Properties:
     Action: "lambda:InvokeFunction"
     FunctionName: 
-      Fn::Sub: arn:aws:lambda:${Region}:${AccountId}:function:{{ lambda_name }}-${Environment} # [lambdaFunction, Arn]
+      Fn::GetAtt: ["{{ lambda_name }}LambdaFunction", "Arn"] # arn:aws:lambda:${Region}:${AccountId}:function:{{ lambda_name }}-${Environment} # [lambdaFunction, Arn]
     Principal: apigateway.amazonaws.com
     SourceArn:
       Fn::Sub: "arn:aws:execute-api:${Region}:${AccountId}:${apiGateway}/*"
@@ -88,5 +115,5 @@
       Fn::Sub: "{{ lambda_name }}-${Environment}"
     Handler: "index.handler"
     Role:
-      Fn::Sub: "arn:aws:iam::${AccountId}:role/service-role/infra-test-reply-message-role-ygzuoc99"
+      Fn::GetAtt: ["{{ lambda_name }}Role", "Arn"]
     Runtime: nodejs12.x

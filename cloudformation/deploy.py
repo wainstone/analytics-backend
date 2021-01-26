@@ -63,13 +63,13 @@ def appendLambda(lambdaYaml):
 def deployStack(cf_client, stack_name, templateBody, parameters):
     print('Attempting to create stack...')
     try: 
-        cf_client.create_stack(StackName=stack_name, TemplateBody=templateBody, Capabilities=['CAPABILITY_IAM'], Parameters=parameters)
+        cf_client.create_stack(StackName=stack_name, TemplateBody=templateBody, Capabilities=['CAPABILITY_NAMED_IAM'], Parameters=parameters)
         watchStack(cf_client, stack_name)
     except Exception as e:
         if 'already exists' in str(e):
             print('The stack already existed. Updating...')
             try:
-                cf_client.update_stack(StackName=stack_name, TemplateBody=templateBody, Capabilities=['CAPABILITY_IAM'], Parameters=parameters)   
+                cf_client.update_stack(StackName=stack_name, TemplateBody=templateBody, Capabilities=['CAPABILITY_NAMED_IAM'], Parameters=parameters)   
                 watchStack(cf_client, stack_name)  
             except Exception as e:
                 if 'No updates are to be performed' in str(e):
