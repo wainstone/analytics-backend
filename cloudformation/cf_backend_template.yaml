@@ -1,0 +1,97 @@
+Parameters:
+  AccountId:
+    Default: '495679467660'
+    Type: String
+  Environment:
+    Default: dev
+    Type: String
+  LambdaName:
+    Default: get_all_athletes
+    Type: String
+  ProjectName:
+    Default: athlytics_jy75
+    Type: String
+  Region:
+    Default: ca-central-1
+    Type: String
+  TableName:
+    Default: athlytics_jy75
+    Type: String
+  ApiReadyToDeploy:
+    Description: Specifies if the lambda functions are created such that the API can be deployed. 
+    Type: String
+    AllowedValues:
+      - "true"
+      - "false" 
+
+Conditions:
+  DeployApi: 
+    Fn::Equals: 
+      - Ref: ApiReadyToDeploy
+      - "true"
+
+Resources:
+
+  apiGateway:
+    Properties:
+      Description: Rest API for Athlytics Capstone Project
+      EndpointConfiguration:
+        Types:
+        - EDGE
+      Name:
+        Fn::Sub: ${ProjectName}_api_${Environment}
+    Type: AWS::ApiGateway::RestApi
+
+  apiGatewayDeployment:
+    Condition: DeployApi
+    DependsOn:
+    - apiResource
+    Properties:
+      RestApiId:
+        Ref: apiGateway
+    Type: AWS::ApiGateway::Deployment
+
+  apiGatewayStage:
+    Condition: DeployApi
+    DependsOn:
+    - apiResource
+    Properties:
+      DeploymentId:
+        Ref: apiGatewayDeployment
+      Description:
+        Fn::Sub: Deployment stage for ${Environment} environment.
+      MethodSettings:
+      - HttpMethod: POST
+        MetricsEnabled: 'true'
+        ResourcePath: /athletes
+      RestApiId:
+        Ref: apiGateway
+      StageName:
+        Ref: Environment
+    Type: AWS::ApiGateway::Stage
+
+  apiResource:
+    DependsOn:
+    - apiGateway
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+        - apiGateway
+        - RootResourceId
+      PathPart: athletes
+      RestApiId:
+        Ref: apiGateway
+    Type: AWS::ApiGateway::Resource
+
+  dynamodbTable:
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: Athlete
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: Athlete
+        KeyType: HASH
+      TableName:
+        Fn::Sub: ${TableName}-${Environment}
+    Type: AWS::DynamoDB::Table

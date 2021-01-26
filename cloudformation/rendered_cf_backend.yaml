@@ -1,0 +1,182 @@
+Conditions:
+  DeployApi:
+    Fn::Equals:
+    - Ref: ApiReadyToDeploy
+    - 'true'
+Parameters:
+  AccountId:
+    Default: '495679467660'
+    Type: String
+  ApiReadyToDeploy:
+    AllowedValues:
+    - 'true'
+    - 'false'
+    Description: Specifies if the lambda functions are created such that the API can
+      be deployed.
+    Type: String
+  Environment:
+    Default: dev
+    Type: String
+  LambdaName:
+    Default: get_all_athletes
+    Type: String
+  ProjectName:
+    Default: athlytics_jy75
+    Type: String
+  Region:
+    Default: ca-central-1
+    Type: String
+  TableName:
+    Default: athlytics_jy75
+    Type: String
+Resources:
+  apiGateway:
+    Properties:
+      Description: Rest API for Athlytics Capstone Project
+      EndpointConfiguration:
+        Types:
+        - EDGE
+      Name:
+        Fn::Sub: ${ProjectName}_api_${Environment}
+    Type: AWS::ApiGateway::RestApi
+  apiGatewayDeployment:
+    Condition: DeployApi
+    DependsOn:
+    - apiResource
+    Properties:
+      RestApiId:
+        Ref: apiGateway
+    Type: AWS::ApiGateway::Deployment
+  apiGatewayStage:
+    Condition: DeployApi
+    DependsOn:
+    - apiResource
+    Properties:
+      DeploymentId:
+        Ref: apiGatewayDeployment
+      Description:
+        Fn::Sub: Deployment stage for ${Environment} environment.
+      MethodSettings:
+      - HttpMethod: POST
+        MetricsEnabled: 'true'
+        ResourcePath: /athletes
+      RestApiId:
+        Ref: apiGateway
+      StageName:
+        Ref: Environment
+    Type: AWS::ApiGateway::Stage
+  apiResource:
+    DependsOn:
+    - apiGateway
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+        - apiGateway
+        - RootResourceId
+      PathPart: athletes
+      RestApiId:
+        Ref: apiGateway
+    Type: AWS::ApiGateway::Resource
+  dynamodbTable:
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: Athlete
+        AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+      - AttributeName: Athlete
+        KeyType: HASH
+      TableName:
+        Fn::Sub: ${TableName}-${Environment}
+    Type: AWS::DynamoDB::Table
+  functionOneApiGatewayInvoke:
+    DependsOn:
+    - apiGateway
+    - functionOneLambdaFunction
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+        - functionOneLambdaFunction
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${Region}:${AccountId}:${apiGateway}/*
+    Type: AWS::Lambda::Permission
+  functionOneApiMethod:
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: ANY
+      Integration:
+        IntegrationHttpMethod: ANY
+        Type: AWS_PROXY
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:functionOne-${Environment}/invocations
+      OperationName: functionOne
+      ResourceId:
+        Ref: apiResource
+      RestApiId:
+        Ref: apiGateway
+    Type: AWS::ApiGateway::Method
+  functionOneLambdaFunction:
+    Properties:
+      Code:
+        ZipFile: "const AWS = require('aws-sdk');\n\nconst dynamo = new AWS.DynamoDB.DocumentClient();\n\
+          \n/**\n* Demonstrates a simple HTTP endpoint using API Gateway. You have\
+          \ full\n* access to the request and response payload, including headers\
+          \ and\n* status code.\n*\n* To scan a DynamoDB table, make a GET request\
+          \ with the TableName as a\n* query string parameter. To put, update, or\
+          \ delete an item, make a POST,\n* PUT, or DELETE request respectively, passing\
+          \ in the payload to the\n* DynamoDB API as a JSON body.\n*/\nexports.handler\
+          \ = async (event, context) => {\n    let body;\n    let statusCode = '200';\n\
+          \    const headers = {\n        'Content-Type': 'application/json',\n  \
+          \      \"Access-Control-Allow-Origin\" : \"*\", // Required for CORS support\
+          \ to work\n        \"Access-Control-Allow-Credentials\" : true // Required\
+          \ for cookies, authorization headers with HTTPS \n    };\n\n    try {\n\
+          \        switch (event.httpMethod) {\n            case 'DELETE':\n     \
+          \           body = await dynamo.delete(JSON.parse(event.body)).promise();\n\
+          \                break;\n            case 'GET':\n                body =\
+          \ await dynamo.scan({ TableName: event.queryStringParameters.TableName }).promise();\n\
+          \                break;\n            case 'POST':\n                body\
+          \ = await dynamo.put(JSON.parse(event.body)).promise();\n              \
+          \  break;\n            case 'PUT':\n                body = await dynamo.update(JSON.parse(event.body)).promise();\n\
+          \                break;\n            default:\n                throw new\
+          \ Error(`Unsupported method \"${event.httpMethod}\"`);\n        }\n    }\
+          \ catch (err) {\n        statusCode = '400';\n        body = err.message;\n\
+          \    } finally {\n        body = JSON.stringify(body);\n    }\n    return\
+          \ {\n        statusCode,\n        body,\n        headers,\n    };\n};\n"
+      FunctionName:
+        Fn::Sub: functionOne-${Environment}
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+        - functionOneRole
+        - Arn
+      Runtime: nodejs12.x
+    Type: AWS::Lambda::Function
+  functionOneRole:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Effect: Allow
+            Resource: '*'
+          Version: '2012-10-17'
+        PolicyName: AWSLambdaBasicExecutionRole
+      RoleName: functionOneRole
+    Type: AWS::IAM::Role
