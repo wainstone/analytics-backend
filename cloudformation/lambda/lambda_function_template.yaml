@@ -23,6 +23,14 @@
           - logs:CreateLogStream
           - logs:PutLogEvents
           Resource: "*"
+    - PolicyName: AthlyticsDynamoAccess
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - "dynamodb:*"
+          Resource: "arg:aws:dynamodb:ca-central-1:495679467660:table/${TableName}-${Environment}"
 
 {{ lambda_name }}ApiMethod:
   Type: AWS::ApiGateway::Method
@@ -31,7 +39,7 @@
     AuthorizationType: NONE
     HttpMethod: ANY
     Integration: 
-      IntegrationHttpMethod: ANY
+      IntegrationHttpMethod: POST
       Type: AWS_PROXY
       Uri: 
         Fn::Sub: "arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:{{ lambda_name }}-${Environment}/invocations"
