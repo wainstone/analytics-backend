@@ -37,9 +37,22 @@ def buildLambda():
 
     # This will eventually be done through reading the folder names (folder name = function name)
     lambda_properties = {
-        "lambda_name": "functionOne"
+        "lambda_name": "functionOne",
     }
 
+
+
+    root, _, _ = os.walk(os.getcwd() + "/lambda/")
+    # Root needs to have atleast 2 element
+    if len(root) < 2:
+        print("Err: lambda directory should have a folder for each function")
+        return
+
+    with open(os.getcwd() + "/lambda/" + root[1][0] + "/index.js", "rb") as code:
+        code_string = code.read()
+
+    lambda_properties["code"] = "\"" + code_string.decode("utf-8") + "\""
+    lambda_properties["lambda_name"] = root[1][0]
     new_rendered = "./lambda/rendered_" + lambda_properties["lambda_name"] + ".yaml"
 
     with open(template, "r") as yamlfile:
