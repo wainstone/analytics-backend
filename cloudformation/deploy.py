@@ -5,6 +5,8 @@ from time import sleep
 import yaml
 from jinja2 import Template 
 
+BACKEND_TEMPLATE = "./cf_backend_template.yaml"
+RENDERED_BACKEND_TEMPLATE = "./rendered_cf_backend.yaml"
 
 def parse_template(template, cloudformation):
     with open(template) as template_fileobj:
@@ -64,25 +66,23 @@ def buildLambda():
 
 # appendLambdas will append the rendered lambda cloudformation files to the actual backend template 
 def appendLambda(lambdaYaml):
-    backend_cf = "./cf_backend_template.yaml"
-
-    with open(backend_cf, "r") as yamlfile:
+    with open(BACKEND_TEMPLATE, "r") as yamlfile:
         curr_yaml = yaml.safe_load(yamlfile)
         curr_yaml["Resources"].update(lambdaYaml)
     
-    with open("./cf_backend.yaml", "w") as yamlfile:
+    with open(RENDERED_BACKEND_TEMPLATE, "w") as yamlfile:
         yaml.safe_dump(curr_yaml, yamlfile)
         
 def deployStack(cf_client, stack_name, templateBody, parameters):
     print('Attempting to create stack...')
     try: 
-        cf_client.create_stack(StackName=stack_name, TemplateBody=templateBody, Capabilities=['CAPABILITY_IAM'], Parameters=parameters)
+        cf_client.create_stack(StackName=stack_name, TemplateBody=templateBody, Capabilities=['CAPABILITY_NAMED_IAM'], Parameters=parameters)
         watchStack(cf_client, stack_name)
     except Exception as e:
         if 'already exists' in str(e):
             print('The stack already existed. Updating...')
             try:
-                cf_client.update_stack(StackName=stack_name, TemplateBody=templateBody, Capabilities=['CAPABILITY_IAM'], Parameters=parameters)   
+                cf_client.update_stack(StackName=stack_name, TemplateBody=templateBody, Capabilities=['CAPABILITY_NAMED_IAM'], Parameters=parameters)   
                 watchStack(cf_client, stack_name)  
             except Exception as e:
                 if 'No updates are to be performed' in str(e):
@@ -103,7 +103,7 @@ def main():
     stack_name = 'athlytics-jy75-' + args.env
     cf_client = boto3.client('cloudformation')
     
-    templateBody = parse_template(os.getcwd() + "/cf_backend.yaml", cf_client)
+    templateBody = parse_template(RENDERED_BACKEND_TEMPLATE, cf_client)
 
     parameters = [
                 {"ParameterKey": "Environment", "ParameterValue": args.env},

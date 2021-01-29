@@ -18,11 +18,12 @@ functionOneApiMethod:
 functionOneApiGatewayInvoke:
   Type: "AWS::Lambda::Permission"
   DependsOn:
+    - apiGateway
     - functionOneLambdaFunction
   Properties:
     Action: "lambda:InvokeFunction"
     FunctionName: 
-      Fn::Sub: arn:aws:lambda:${Region}:${AccountId}:function:functionOne-${Environment} # [lambdaFunction, Arn]
+      Ref: functionOneLambdaFunction
     Principal: apigateway.amazonaws.com
     SourceArn:
       Fn::Sub: "arn:aws:execute-api:${Region}:${AccountId}:${apiGateway}/*"
