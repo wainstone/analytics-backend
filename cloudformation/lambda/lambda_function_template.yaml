@@ -30,7 +30,9 @@
         - Effect: Allow
           Action:
           - "dynamodb:*"
-          Resource: "arg:aws:dynamodb:ca-central-1:495679467660:table/${TableName}-${Environment}"
+          Resource: 
+            Fn::Sub: "arn:aws:dynamodb:ca-central-1:${AccountId}:table/${TableName}-${Environment}"
+
 
 {{ lambda_name }}ApiMethod:
   Type: AWS::ApiGateway::Method
