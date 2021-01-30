@@ -122,30 +122,9 @@ Resources:
   functionOneLambdaFunction:
     Properties:
       Code:
-        ZipFile: "const AWS = require('aws-sdk');\n\nconst dynamo = new AWS.DynamoDB.DocumentClient();\n\
-          \n/**\n* Demonstrates a simple HTTP endpoint using API Gateway. You have\
-          \ full\n* access to the request and response payload, including headers\
-          \ and\n* status code.\n*\n* To scan a DynamoDB table, make a GET request\
-          \ with the TableName as a\n* query string parameter. To put, update, or\
-          \ delete an item, make a POST,\n* PUT, or DELETE request respectively, passing\
-          \ in the payload to the\n* DynamoDB API as a JSON body.\n*/\nexports.handler\
-          \ = async (event, context) => {\n    let body;\n    let statusCode = '200';\n\
-          \    const headers = {\n        'Content-Type': 'application/json',\n  \
-          \      \"Access-Control-Allow-Origin\" : \"*\", // Required for CORS support\
-          \ to work\n        \"Access-Control-Allow-Credentials\" : true // Required\
-          \ for cookies, authorization headers with HTTPS \n    };\n\n    try {\n\
-          \        switch (event.httpMethod) {\n            case 'DELETE':\n     \
-          \           body = await dynamo.delete(JSON.parse(event.body)).promise();\n\
-          \                break;\n            case 'GET':\n                body =\
-          \ await dynamo.scan({ TableName: event.queryStringParameters.TableName }).promise();\n\
-          \                break;\n            case 'POST':\n                body\
-          \ = await dynamo.put(JSON.parse(event.body)).promise();\n              \
-          \  break;\n            case 'PUT':\n                body = await dynamo.update(JSON.parse(event.body)).promise();\n\
-          \                break;\n            default:\n                throw new\
-          \ Error(`Unsupported method \"${event.httpMethod}\"`);\n        }\n    }\
-          \ catch (err) {\n        statusCode = '400';\n        body = err.message;\n\
-          \    } finally {\n        body = JSON.stringify(body);\n    }\n    return\
-          \ {\n        statusCode,\n        body,\n        headers,\n    };\n};\n"
+        ZipFile: 'exports.handler = async (event) => { const response = { statusCode:
+          200, body: JSON.stringify(''function one YOHOO!''), }; return response;
+          };'
       FunctionName:
         Fn::Sub: functionOne-${Environment}
       Handler: index.handler
