@@ -69,7 +69,8 @@
   Type: AWS::Lambda::Function
   Properties: 
     Code: 
-      ZipFile: {{ code }}
+      ZipFile: |
+        {{ code | indent(8)}}
     FunctionName: 
       Fn::Sub: "{{ lambda_name }}-${Environment}"
     Handler: "index.handler"

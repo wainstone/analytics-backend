@@ -39,21 +39,21 @@ def createLambdas(env):
     lambdaYaml_list = []
 
     # Properties dictionary to hold information for each lambda function 
-    functionOneProperties = {
+    functionTwoProperties = {
         "env": env,
-        "lambda_name": "functionOne",
+        "lambda_name": "functionTwo",
         "http_method": "POST",
         "api_resource": "athletesApiResource"
     }
 
-    functionTwoProperties = {
+    handleGet = {
         "env": env,
-        "lambda_name": "functionTwo",
+        "lambda_name": "handleGet",
         "http_method": "GET",
         "api_resource": "athletesApiResource"
     }
 
-    lambdaYaml_list.append(buildLambda(functionOneProperties))
+    lambdaYaml_list.append(buildLambda(handleGet))
     lambdaYaml_list.append(buildLambda(functionTwoProperties))
 
     appendLambdas(lambdaYaml_list)
@@ -63,10 +63,10 @@ def buildLambda(lambda_properties):
 
     with open(os.getcwd() + "/lambda/" + lambda_properties["lambda_name"] + "/index.js", "rb") as code:
             code_string = code.read()
-            lambda_properties["code"] = "\"" + code_string.decode("utf-8") + "\""
-    with open(LAMBDA_TEMPLATE, "r") as yamlfile:
+            lambda_properties["code"] = code_string.decode("UTF-8")
+    with open(LAMBDA_TEMPLATE, "rb") as yamlfile:
             template_string = yamlfile.read()
-            template = Template(template_string)
+            template = Template(template_string.decode("UTF-8"))
             rendered = template.render(lambda_properties)
             return yaml.safe_load(rendered)
     
