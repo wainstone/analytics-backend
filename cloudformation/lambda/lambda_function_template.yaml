@@ -1,7 +1,8 @@
-{{ lambda_name }}Role:
+---
+{{ lambda_name }}Role{{ env }}:
   Type: AWS::IAM::Role
   Properties:
-    RoleName: {{ lambda_name }}Role
+    RoleName: {{ lambda_name }}Role-{{ env }}
     AssumeRolePolicyDocument:
       Version: '2012-10-17'
       Statement:
@@ -39,7 +40,7 @@
   Properties:
     ApiKeyRequired: False
     AuthorizationType: NONE
-    HttpMethod: ANY
+    HttpMethod: {{ http_method }}
     Integration: 
       IntegrationHttpMethod: POST
       Type: AWS_PROXY
@@ -47,7 +48,7 @@
         Fn::Sub: "arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:{{ lambda_name }}-${Environment}/invocations"
     OperationName: {{ lambda_name }}
     ResourceId:
-      Ref: apiResource
+      Ref: {{ api_resource }}
     RestApiId:
       Ref: apiGateway
 
@@ -73,5 +74,5 @@
       Fn::Sub: "{{ lambda_name }}-${Environment}"
     Handler: "index.handler"
     Role:
-      Fn::GetAtt: ["{{ lambda_name }}Role", "Arn"]
+      Fn::GetAtt: ["{{ lambda_name }}Role{{ env }}", "Arn"]
     Runtime: nodejs12.x

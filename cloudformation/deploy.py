@@ -7,6 +7,7 @@ from jinja2 import Template
 
 BACKEND_TEMPLATE = "./cf_backend_template.yaml"
 RENDERED_BACKEND_TEMPLATE = "./rendered_cf_backend.yaml"
+LAMBDA_TEMPLATE = "./lambda/lambda_function_template.yaml"
 
 def parse_template(template, cloudformation):
     with open(template) as template_fileobj:
@@ -32,43 +33,52 @@ def watchStack(cf_client, stackName):
                 print("Stack creation finished with status: " + status)
                 break
 
-# This function will use the lambda function CF template to create the CloudFormation represenation of each lambda function
-def buildLambda():
+def createLambdas(env):
+    
+    # List of each Lambda's rendered yaml 
+    lambdaYaml_list = []
 
-    template = "./lambda/lambda_function_template.yaml"
-
-    # This will eventually be done through reading the folder names (folder name = function name)
-    lambda_properties = {
+    # Properties dictionary to hold information for each lambda function 
+    functionOneProperties = {
+        "env": env,
         "lambda_name": "functionOne",
+        "http_method": "POST",
+        "api_resource": "athletesApiResource"
     }
 
+    functionTwoProperties = {
+        "env": env,
+        "lambda_name": "functionTwo",
+        "http_method": "GET",
+        "api_resource": "athletesApiResource"
+    }
 
+    lambdaYaml_list.append(buildLambda(functionOneProperties))
+    lambdaYaml_list.append(buildLambda(functionTwoProperties))
 
-    root, _, _ = os.walk(os.getcwd() + "/lambda/")
-    # Root needs to have atleast 2 element
-    if len(root) < 2:
-        print("Err: lambda directory should have a folder for each function")
-        return
+    appendLambdas(lambdaYaml_list)
 
-    with open(os.getcwd() + "/lambda/" + root[1][0] + "/index.js", "rb") as code:
-        code_string = code.read()
+# Uses a property dictionary render a new Lambda function as CloudFormation
+def buildLambda(lambda_properties):
 
-    lambda_properties["code"] = "\"" + code_string.decode("utf-8") + "\""
-    lambda_properties["lambda_name"] = root[1][0]
-    new_rendered = "./lambda/rendered_" + lambda_properties["lambda_name"] + ".yaml"
-
-    with open(template, "r") as yamlfile:
-        template_string = yamlfile.read()
-        template = Template(template_string)
-        rendered = template.render(lambda_properties)
-        appendLambda(yaml.safe_load(rendered))
+    with open(os.getcwd() + "/lambda/" + lambda_properties["lambda_name"] + "/index.js", "rb") as code:
+            code_string = code.read()
+            lambda_properties["code"] = "\"" + code_string.decode("utf-8") + "\""
+    with open(LAMBDA_TEMPLATE, "r") as yamlfile:
+            template_string = yamlfile.read()
+            template = Template(template_string)
+            rendered = template.render(lambda_properties)
+            return yaml.safe_load(rendered)
     
 
 # appendLambdas will append the rendered lambda cloudformation files to the actual backend template 
-def appendLambda(lambdaYaml):
+def appendLambdas(lambdaYaml_list):
     with open(BACKEND_TEMPLATE, "r") as yamlfile:
         curr_yaml = yaml.safe_load(yamlfile)
-        curr_yaml["Resources"].update(lambdaYaml)
+
+        # Append each Lambda yaml
+        for y in lambdaYaml_list:
+            curr_yaml["Resources"].update(y)
     
     with open(RENDERED_BACKEND_TEMPLATE, "w") as yamlfile:
         yaml.safe_dump(curr_yaml, yamlfile)
@@ -94,11 +104,13 @@ def deployStack(cf_client, stack_name, templateBody, parameters):
 
 def main():
 
-    buildLambda()
 
     parser = argparse.ArgumentParser(description='Process deployment arguments.')
     parser.add_argument('--env', type=str, required=True, help='The environment to deploy the stack to. Choose your name if unsure.')
     args = parser.parse_args()
+
+    # Build lambda functions from their JS files and append to the CF template
+    createLambdas(args.env)
 
     stack_name = 'athlytics-jy75-' + args.env
     cf_client = boto3.client('cloudformation')
