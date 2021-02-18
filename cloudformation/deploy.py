@@ -39,9 +39,9 @@ def createLambdas(env):
     lambdaYaml_list = []
 
     # Properties dictionary to hold information for each lambda function 
-    functionTwoProperties = {
+    handleInsert = {
         "env": env,
-        "lambda_name": "functionTwo",
+        "lambda_name": "handleInsert",
         "http_method": "POST",
         "api_resource": "athletesApiResource"
     }
@@ -54,7 +54,7 @@ def createLambdas(env):
     }
 
     lambdaYaml_list.append(buildLambda(handleGet))
-    lambdaYaml_list.append(buildLambda(functionTwoProperties))
+    lambdaYaml_list.append(buildLambda(handleInsert))
 
     appendLambdas(lambdaYaml_list)
 
