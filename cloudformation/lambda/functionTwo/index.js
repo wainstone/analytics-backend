@@ -1,8 +1,7 @@
 exports.handler = async (event) => {
-    // TODO implement
     const response = {
         statusCode: 200,
-        body: JSON.stringify('I\'m function two!'),
+        body: JSON.stringify('Im function two!'),
     };
     return response;
 };
