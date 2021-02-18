@@ -116,13 +116,14 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: false
 
   dynamodbTable:
+    DeletionPolicy: Retain
     Properties:
       AttributeDefinitions:
-      - AttributeName: Athlete
+      - AttributeName: athlete
         AttributeType: S
       BillingMode: PAY_PER_REQUEST
       KeySchema:
-      - AttributeName: Athlete
+      - AttributeName: athlete
         KeyType: HASH
       TableName:
         Fn::Sub: ${TableName}-${Environment}
