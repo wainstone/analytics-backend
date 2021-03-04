@@ -1,7 +1,43 @@
 const AWS = require('aws-sdk');
 
 const dynamo = new AWS.DynamoDB.DocumentClient();
-const TABLENAME = "athlytics_jy75-options" // this should be converted to an env variable 
+const TABLENAME = "athlytics_jy75-dev"; // this should be converted to an env variable
+
+
+async function filterAthletes(queryParams, athletes) {
+    let athleteIdx = athletes.length;
+    while (athleteIdx--) {
+        let races = athletes[athleteIdx].races;
+        let filtered = true;
+        for (let raceIdx = 0; raceIdx < races.length; raceIdx++) {
+            filtered = true;
+            if (!queryParams.province || queryParams.province == races[raceIdx].province)
+                filtered = filtered && true;
+            else
+                filtered = filtered && false;
+            if (!queryParams.syear || queryParams.syear <= races[raceIdx].year)
+                filtered = filtered && true;
+            else
+                filtered = filtered && false;
+            if (!queryParams.eyear || queryParams.eyear >= races[raceIdx].year)
+                filtered = filtered && true;
+            else
+                filtered = filtered && false;
+            if (!queryParams.splace || queryParams.splace <= races[raceIdx].place)
+                filtered = filtered && true;
+            else
+                filtered = filtered && false;
+            if (!queryParams.eplace || queryParams.eplace >= races[raceIdx].place)
+                filtered = filtered && true;
+            else
+                filtered = filtered && false;
+            if (filtered)
+                break;
+        }
+        if (!filtered)
+            athletes.splice(athleteIdx, 1);
+    }
+}
 
 exports.handler = async (event, context) => {
     let body;
@@ -11,14 +47,42 @@ exports.handler = async (event, context) => {
         "Access-Control-Allow-Origin" : "*",
         "Access-Control-Allow-Credentials" : true
     };
-    let command = parseInt(event.headers.command)
+
     try {
+        let command = parseInt(event.queryStringParameters.command);
         switch (command) {
             case 1:
-                let percentiles = event.headers.percentiles.split(",").map(x => parseFloat(x));
-                let threshold = event.headers.threshold;
+                let percentiles = event.queryStringParameters.percentiles.split(",").map(x => parseFloat(x));
+                let threshold = event.queryStringParameters.threshold;
                 let data = await dynamo.scan({ TableName: TABLENAME }).promise();
                 body = meanSquareError(data["Items"], percentiles, threshold);
+                break;
+            case 3:
+                var params = { TableName: TABLENAME };
+                if (event.queryStringParameters.name || event.queryStringParameters.gender || event.queryStringParameters.province ||
+                   event.queryStringParameters.splace || event.queryStringParameters.eplace) {
+                       params.ExpressionAttributeNames = {};
+                       params.ExpressionAttributeValues = {};
+                       params.FilterExpression = "";
+                }
+                if (event.queryStringParameters.name) {
+                    params.ExpressionAttributeNames["#name"] = "athlete";
+                    params.ExpressionAttributeValues[":name"] = event.queryStringParameters.name;
+                    if (params.FilterExpression === "")
+                        params.FilterExpression = "#name = :name";
+                    else
+                        params.FilterExpression += " AND #name = :name";
+                }
+                if (event.queryStringParameters.gender) {
+                    params.ExpressionAttributeNames["#gender"] = "gender";
+                    params.ExpressionAttributeValues[":gender"] = event.queryStringParameters.gender;
+                    if (params.FilterExpression === "")
+                        params.FilterExpression = "#gender = :gender";
+                    else
+                        params.FilterExpression += " AND #gender = :gender";
+                }
+                body = await dynamo.scan(params).promise();
+                await filterAthletes(event.queryStringParameters, body.Items);
                 break;
             default:
                 statusCode = '400';
