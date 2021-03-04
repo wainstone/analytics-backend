@@ -53,8 +53,16 @@ def createLambdas(env):
         "api_resource": "athletesApiResource"
     }
 
+    handleAdminInsert = {
+        "env": env,
+        "lambda_name": "handleAdminInsert",
+        "http_method": "ANY",
+        "api_resource": "adminApiResource"
+    }
+
     lambdaYaml_list.append(buildLambda(handleGet))
     lambdaYaml_list.append(buildLambda(handleInsert))
+    lambdaYaml_list.append(buildLambda(handleAdminInsert))
 
     appendLambdas(lambdaYaml_list)
 
