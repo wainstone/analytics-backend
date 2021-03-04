@@ -1,3 +1,4 @@
+---
 Parameters:
   AccountId:
     Default: '495679467660'
@@ -45,7 +46,7 @@ Resources:
   apiGatewayDeployment:
     Condition: DeployApi
     DependsOn:
-    - apiResource
+    - athletesApiResource
     Properties:
       RestApiId:
         Ref: apiGateway
@@ -54,7 +55,7 @@ Resources:
   apiGatewayStage:
     Condition: DeployApi
     DependsOn:
-    - apiResource
+    - athletesApiResource
     Properties:
       DeploymentId:
         Ref: apiGatewayDeployment
@@ -70,7 +71,7 @@ Resources:
         Ref: Environment
     Type: AWS::ApiGateway::Stage
 
-  apiResource:
+  athletesApiResource:
     DependsOn:
     - apiGateway
     Properties:
@@ -83,14 +84,94 @@ Resources:
         Ref: apiGateway
     Type: AWS::ApiGateway::Resource
 
+  athletesOptionsApiMethod:
+    DependsOn:
+    - athletesApiResource
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      RestApiId:
+        Ref: apiGateway
+      ResourceId:
+        Ref: athletesApiResource
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,GET,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+
+  adminApiResource:
+    DependsOn:
+    - apiGateway
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+        - apiGateway
+        - RootResourceId
+      PathPart: admin
+      RestApiId:
+        Ref: apiGateway
+    Type: AWS::ApiGateway::Resource
+
+  adminOptionsApiMethod:
+    DependsOn:
+    - adminApiResource
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      RestApiId:
+        Ref: apiGateway
+      ResourceId:
+        Ref: adminApiResource
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,GET,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+
   dynamodbTable:
+    DeletionPolicy: Retain
     Properties:
       AttributeDefinitions:
-      - AttributeName: Athlete
+      - AttributeName: athlete
         AttributeType: S
       BillingMode: PAY_PER_REQUEST
       KeySchema:
-      - AttributeName: Athlete
+      - AttributeName: athlete
         KeyType: HASH
       TableName:
         Fn::Sub: ${TableName}-${Environment}

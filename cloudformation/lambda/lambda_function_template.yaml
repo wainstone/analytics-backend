@@ -1,7 +1,8 @@
-{{ lambda_name }}Role:
+---
+{{ lambda_name }}Role{{ env }}:
   Type: AWS::IAM::Role
   Properties:
-    RoleName: {{ lambda_name }}Role
+    RoleName: {{ lambda_name }}Role-{{ env }}
     AssumeRolePolicyDocument:
       Version: '2012-10-17'
       Statement:
@@ -23,21 +24,31 @@
           - logs:CreateLogStream
           - logs:PutLogEvents
           Resource: "*"
+    - PolicyName: AthlyticsDynamoAccess
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - "dynamodb:*"
+          Resource: 
+            Fn::Sub: "arn:aws:dynamodb:ca-central-1:${AccountId}:table/${TableName}-${Environment}"
+
 
 {{ lambda_name }}ApiMethod:
   Type: AWS::ApiGateway::Method
   Properties:
     ApiKeyRequired: False
     AuthorizationType: NONE
-    HttpMethod: ANY
+    HttpMethod: {{ http_method }}
     Integration: 
-      IntegrationHttpMethod: ANY
+      IntegrationHttpMethod: POST
       Type: AWS_PROXY
       Uri: 
         Fn::Sub: "arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:{{ lambda_name }}-${Environment}/invocations"
     OperationName: {{ lambda_name }}
     ResourceId:
-      Ref: apiResource
+      Ref: {{ api_resource }}
     RestApiId:
       Ref: apiGateway
 
@@ -59,61 +70,10 @@
   Properties: 
     Code: 
       ZipFile: |
-        const AWS = require('aws-sdk');
-
-        const dynamo = new AWS.DynamoDB.DocumentClient();
-
-        /**
-        * Demonstrates a simple HTTP endpoint using API Gateway. You have full
-        * access to the request and response payload, including headers and
-        * status code.
-        *
-        * To scan a DynamoDB table, make a GET request with the TableName as a
-        * query string parameter. To put, update, or delete an item, make a POST,
-        * PUT, or DELETE request respectively, passing in the payload to the
-        * DynamoDB API as a JSON body.
-        */
-        exports.handler = async (event, context) => {
-            let body;
-            let statusCode = '200';
-            const headers = {
-                'Content-Type': 'application/json',
-                "Access-Control-Allow-Origin" : "*", // Required for CORS support to work
-                "Access-Control-Allow-Credentials" : true // Required for cookies, authorization headers with HTTPS 
-            };
-
-            try {
-                switch (event.httpMethod) {
-                    case 'DELETE':
-                        body = await dynamo.delete(JSON.parse(event.body)).promise();
-                        break;
-                    case 'GET':
-                        body = await dynamo.scan({ TableName: event.queryStringParameters.TableName }).promise();
-                        break;
-                    case 'POST':
-                        body = await dynamo.put(JSON.parse(event.body)).promise();
-                        break;
-                    case 'PUT':
-                        body = await dynamo.update(JSON.parse(event.body)).promise();
-                        break;
-                    default:
-                        throw new Error(`Unsupported method "${event.httpMethod}"`);
-                }
-            } catch (err) {
-                statusCode = '400';
-                body = err.message;
-            } finally {
-                body = JSON.stringify(body);
-            }
-            return {
-                statusCode,
-                body,
-                headers,
-            };
-        };
+        {{ code | indent(8)}}
     FunctionName: 
       Fn::Sub: "{{ lambda_name }}-${Environment}"
     Handler: "index.handler"
     Role:
-      Fn::GetAtt: ["{{ lambda_name }}Role", "Arn"]
+      Fn::GetAtt: ["{{ lambda_name }}Role{{ env }}", "Arn"]
     Runtime: nodejs12.x

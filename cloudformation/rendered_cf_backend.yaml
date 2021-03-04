@@ -30,6 +30,50 @@ Parameters:
     Default: athlytics_jy75
     Type: String
 Resources:
+  adminApiResource:
+    DependsOn:
+    - apiGateway
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+        - apiGateway
+        - RootResourceId
+      PathPart: admin
+      RestApiId:
+        Ref: apiGateway
+    Type: AWS::ApiGateway::Resource
+  adminOptionsApiMethod:
+    DependsOn:
+    - adminApiResource
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
+            method.response.header.Access-Control-Allow-Methods: '''POST,GET,OPTIONS'''
+            method.response.header.Access-Control-Allow-Origin: '''*'''
+          ResponseTemplates:
+            application/json: ''
+          StatusCode: 200
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - ResponseModels:
+          application/json: Empty
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+        StatusCode: 200
+      ResourceId:
+        Ref: adminApiResource
+      RestApiId:
+        Ref: apiGateway
+    Type: AWS::ApiGateway::Method
   apiGateway:
     Properties:
       Description: Rest API for Athlytics Capstone Project
@@ -42,7 +86,7 @@ Resources:
   apiGatewayDeployment:
     Condition: DeployApi
     DependsOn:
-    - apiResource
+    - athletesApiResource
     Properties:
       RestApiId:
         Ref: apiGateway
@@ -50,7 +94,7 @@ Resources:
   apiGatewayStage:
     Condition: DeployApi
     DependsOn:
-    - apiResource
+    - athletesApiResource
     Properties:
       DeploymentId:
         Ref: apiGatewayDeployment
@@ -65,7 +109,7 @@ Resources:
       StageName:
         Ref: Environment
     Type: AWS::ApiGateway::Stage
-  apiResource:
+  athletesApiResource:
     DependsOn:
     - apiGateway
     Properties:
@@ -77,85 +121,127 @@ Resources:
       RestApiId:
         Ref: apiGateway
     Type: AWS::ApiGateway::Resource
+  athletesOptionsApiMethod:
+    DependsOn:
+    - athletesApiResource
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
+            method.response.header.Access-Control-Allow-Methods: '''POST,GET,OPTIONS'''
+            method.response.header.Access-Control-Allow-Origin: '''*'''
+          ResponseTemplates:
+            application/json: ''
+          StatusCode: 200
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - ResponseModels:
+          application/json: Empty
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+        StatusCode: 200
+      ResourceId:
+        Ref: athletesApiResource
+      RestApiId:
+        Ref: apiGateway
+    Type: AWS::ApiGateway::Method
   dynamodbTable:
+    DeletionPolicy: Retain
     Properties:
       AttributeDefinitions:
-      - AttributeName: Athlete
+      - AttributeName: athlete
         AttributeType: S
       BillingMode: PAY_PER_REQUEST
       KeySchema:
-      - AttributeName: Athlete
+      - AttributeName: athlete
         KeyType: HASH
       TableName:
         Fn::Sub: ${TableName}-${Environment}
     Type: AWS::DynamoDB::Table
-  functionOneApiGatewayInvoke:
+  handleAdminInsertApiGatewayInvoke:
     DependsOn:
     - apiGateway
-    - functionOneLambdaFunction
+    - handleAdminInsertLambdaFunction
     Properties:
       Action: lambda:InvokeFunction
       FunctionName:
         Fn::GetAtt:
-        - functionOneLambdaFunction
+        - handleAdminInsertLambdaFunction
         - Arn
       Principal: apigateway.amazonaws.com
       SourceArn:
         Fn::Sub: arn:aws:execute-api:${Region}:${AccountId}:${apiGateway}/*
     Type: AWS::Lambda::Permission
-  functionOneApiMethod:
+  handleAdminInsertApiMethod:
     Properties:
       ApiKeyRequired: false
       AuthorizationType: NONE
       HttpMethod: ANY
       Integration:
-        IntegrationHttpMethod: ANY
+        IntegrationHttpMethod: POST
         Type: AWS_PROXY
         Uri:
-          Fn::Sub: arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:functionOne-${Environment}/invocations
-      OperationName: functionOne
+          Fn::Sub: arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:handleAdminInsert-${Environment}/invocations
+      OperationName: handleAdminInsert
       ResourceId:
-        Ref: apiResource
+        Ref: adminApiResource
       RestApiId:
         Ref: apiGateway
     Type: AWS::ApiGateway::Method
-  functionOneLambdaFunction:
+  handleAdminInsertLambdaFunction:
     Properties:
       Code:
         ZipFile: "const AWS = require('aws-sdk');\n\nconst dynamo = new AWS.DynamoDB.DocumentClient();\n\
-          \n/**\n* Demonstrates a simple HTTP endpoint using API Gateway. You have\
-          \ full\n* access to the request and response payload, including headers\
-          \ and\n* status code.\n*\n* To scan a DynamoDB table, make a GET request\
-          \ with the TableName as a\n* query string parameter. To put, update, or\
-          \ delete an item, make a POST,\n* PUT, or DELETE request respectively, passing\
-          \ in the payload to the\n* DynamoDB API as a JSON body.\n*/\nexports.handler\
-          \ = async (event, context) => {\n    let body;\n    let statusCode = '200';\n\
-          \    const headers = {\n        'Content-Type': 'application/json',\n  \
-          \      \"Access-Control-Allow-Origin\" : \"*\", // Required for CORS support\
-          \ to work\n        \"Access-Control-Allow-Credentials\" : true // Required\
-          \ for cookies, authorization headers with HTTPS \n    };\n\n    try {\n\
-          \        switch (event.httpMethod) {\n            case 'DELETE':\n     \
-          \           body = await dynamo.delete(JSON.parse(event.body)).promise();\n\
-          \                break;\n            case 'GET':\n                body =\
-          \ await dynamo.scan({ TableName: event.queryStringParameters.TableName }).promise();\n\
-          \                break;\n            case 'POST':\n                body\
-          \ = await dynamo.put(JSON.parse(event.body)).promise();\n              \
-          \  break;\n            case 'PUT':\n                body = await dynamo.update(JSON.parse(event.body)).promise();\n\
+          const tableName = 'athlytics_jy75-dev';\n\nasync function getExistingRaces(athleteName){\n\
+          \    const params = {\n        TableName : tableName,\n        FilterExpression\
+          \ : 'Athlete = :athlete_Name',\n        ExpressionAttributeValues : {':athlete_Name'\
+          \ : athleteName}\n    };\n    const existingAthlete  = await dynamo.scan(params).promise();\n\
+          \    if (!existingAthlete.Items || existingAthlete.Items.length == 0)\n\
+          \        return [];\n    else\n        return existingAthlete.Items[0].Races;\n\
+          }\n\nasync function uploadData(body) {\n    if (!body || !body.Athletes)\
+          \ \n        throw new Error(\"Athletes not found\");\n    const res = {\"\
+          athletes\": []};\n    const athletes = body.Athletes;\n\n    for (let i\
+          \ = 0; i < athletes.length; i++) {\n        const existingRaces = await\
+          \ getExistingRaces(athletes[i].Athlete);\n        const newAthlte = {};\n\
+          \        newAthlte.TableName = tableName;\n        newAthlte.Item = {};\n\
+          \        newAthlte.Item.athlete = athletes[i].Athlete;\n        newAthlte.Item.gender\
+          \ = athletes[i].Gender;\n        newAthlte.Item.notes = athletes[i].Notes;\n\
+          \        newAthlte.Item.races = existingRaces;\n        newAthlte.Item.races.push(...athletes[i].Races);\n\
+          \        await dynamo.put(newAthlte).promise();\n        res.athletes.push(newAthlte);\n\
+          \    }\n    return res;\n}\n\n/**\n * Update the athlete database upon a\
+          \ PUT with new races.\n * \n * SAMPLE PAYLOAD:\n * {\n *     \"Athletes\"\
+          : [\n *         {\n *             \"Athlete\": \"athleteName\",\n *    \
+          \         \"Races\": [\n *                 {\n *                     \"\
+          category\": \"JG\",\n *                     \"place\": 13,\n *         \
+          \            \"province\": \"ON\",\n *                     \"year\": 2022\n\
+          \ *                 }\n *             ]\n *         }\n *     ]\n * }\n\
+          \ */\nexports.handler = async (event, context) => {\n    let body;\n   \
+          \ let statusCode = '200';\n    const headers = {\n        'Content-Type':\
+          \ 'application/json',\n    };\n    try {\n        switch (event.httpMethod)\
+          \ {\n            case 'PUT':\n                body = await uploadData(JSON.parse(event.body));\n\
           \                break;\n            default:\n                throw new\
           \ Error(`Unsupported method \"${event.httpMethod}\"`);\n        }\n    }\
           \ catch (err) {\n        statusCode = '400';\n        body = err.message;\n\
-          \    } finally {\n        body = JSON.stringify(body);\n    }\n    return\
+          \    } finally {\n        body = JSON.stringify(body);\n    }\n\n    return\
           \ {\n        statusCode,\n        body,\n        headers,\n    };\n};\n"
       FunctionName:
-        Fn::Sub: functionOne-${Environment}
+        Fn::Sub: handleAdminInsert-${Environment}
       Handler: index.handler
       Role:
         Fn::GetAtt:
-        - functionOneRole
+        - handleAdminInsertRoledev
         - Arn
       Runtime: nodejs12.x
     Type: AWS::Lambda::Function
-  functionOneRole:
+  handleAdminInsertRoledev:
     Properties:
       AssumeRolePolicyDocument:
         Statement:
@@ -178,5 +264,216 @@ Resources:
             Resource: '*'
           Version: '2012-10-17'
         PolicyName: AWSLambdaBasicExecutionRole
-      RoleName: functionOneRole
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - dynamodb:*
+            Effect: Allow
+            Resource:
+              Fn::Sub: arn:aws:dynamodb:ca-central-1:${AccountId}:table/${TableName}-${Environment}
+          Version: '2012-10-17'
+        PolicyName: AthlyticsDynamoAccess
+      RoleName: handleAdminInsertRole-dev
+    Type: AWS::IAM::Role
+  handleGetApiGatewayInvoke:
+    DependsOn:
+    - apiGateway
+    - handleGetLambdaFunction
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+        - handleGetLambdaFunction
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${Region}:${AccountId}:${apiGateway}/*
+    Type: AWS::Lambda::Permission
+  handleGetApiMethod:
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: GET
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:handleGet-${Environment}/invocations
+      OperationName: handleGet
+      ResourceId:
+        Ref: athletesApiResource
+      RestApiId:
+        Ref: apiGateway
+    Type: AWS::ApiGateway::Method
+  handleGetLambdaFunction:
+    Properties:
+      Code:
+        ZipFile: "const AWS = require('aws-sdk');\n\nconst dynamo = new AWS.DynamoDB.DocumentClient();\n\
+          const TABLENAME = \"athlytics_jy75-dev\" // this should be converted to\
+          \ an env variable \n\nexports.handler = async (event, context) => {\n  \
+          \  let body;\n    let statusCode = '200';\n    const headers = {\n     \
+          \   'Content-Type': 'application/json',\n        \"Access-Control-Allow-Origin\"\
+          \ : \"*\",\n        \"Access-Control-Allow-Credentials\" : true\n    };\n\
+          \    let command = parseInt(event.queryStringParameters.command)\n    try\
+          \ {\n        switch (command) {\n            case 1:\n                let\
+          \ percentiles = event.queryStringParameters.percentiles.split(\",\").map(x\
+          \ => parseFloat(x));\n                let threshold = event.queryStringParameters.threshold;\n\
+          \                let data = await dynamo.scan({ TableName: TABLENAME }).promise();\n\
+          \                body = meanSquareError(data[\"Items\"], percentiles, threshold);\n\
+          \                break;\n            default:\n                statusCode\
+          \ = '400';\n                throw new Error(`Unsupported method \"${event.httpMethod}\"\
+          `);\n        }\n\n        \n    } catch (err) {\n        body = err.message;\n\
+          \    } finally {\n        body = JSON.stringify(body);\n    }\n    return\
+          \ {\n        statusCode,\n        body,\n        headers,\n    };\n};\n\n\
+          function meanSquareError(athletes, percentiles, threshold) {\n    let similar\
+          \ = [];\n    athletes.forEach(entry => {\n        let athlete = entry[\"\
+          athlete\"];\n        let races = entry[\"races\"];\n\n        let hsRaces\
+          \ = races.filter(race => race.category != \"university\");\n        console.log(hsRaces.length);\n\
+          \        console.log(percentiles.length);\n        if (hsRaces.length >=\
+          \ percentiles.length) {\n            let length = Math.min(hsRaces.length,\
+          \ percentiles.length);\n            let sum = 0;\n            for (let i\
+          \ = 0; i < length; i++) {\n                sum += Math.pow((hsRaces[i].percentile\
+          \ - percentiles[i]), 2)\n            }\n            let mse = sum / length;\n\
+          \            \n            similar.push({ 'athlete': athlete, 'races': races,\
+          \ 'mse': mse});\n        }\n    });\n    similar.sort((a, b) => a.mse -\
+          \ b.mse);\n\n    let topAthletes = [];\n    for (let i = 0; i < Math.min(threshold,\
+          \ similar.length); i++) {\n        topAthletes.push(similar[i]);\n    }\n\
+          \    return topAthletes;\n}\n"
+      FunctionName:
+        Fn::Sub: handleGet-${Environment}
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+        - handleGetRoledev
+        - Arn
+      Runtime: nodejs12.x
+    Type: AWS::Lambda::Function
+  handleGetRoledev:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Effect: Allow
+            Resource: '*'
+          Version: '2012-10-17'
+        PolicyName: AWSLambdaBasicExecutionRole
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - dynamodb:*
+            Effect: Allow
+            Resource:
+              Fn::Sub: arn:aws:dynamodb:ca-central-1:${AccountId}:table/${TableName}-${Environment}
+          Version: '2012-10-17'
+        PolicyName: AthlyticsDynamoAccess
+      RoleName: handleGetRole-dev
+    Type: AWS::IAM::Role
+  handleInsertApiGatewayInvoke:
+    DependsOn:
+    - apiGateway
+    - handleInsertLambdaFunction
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName:
+        Fn::GetAtt:
+        - handleInsertLambdaFunction
+        - Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn:
+        Fn::Sub: arn:aws:execute-api:${Region}:${AccountId}:${apiGateway}/*
+    Type: AWS::Lambda::Permission
+  handleInsertApiMethod:
+    Properties:
+      ApiKeyRequired: false
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${Region}:${AccountId}:function:handleInsert-${Environment}/invocations
+      OperationName: handleInsert
+      ResourceId:
+        Ref: athletesApiResource
+      RestApiId:
+        Ref: apiGateway
+    Type: AWS::ApiGateway::Method
+  handleInsertLambdaFunction:
+    Properties:
+      Code:
+        ZipFile: "const AWS = require('aws-sdk');\n\nconst dynamo = new AWS.DynamoDB.DocumentClient();\n\
+          \n/**\n* Demonstrates a simple HTTP endpoint using API Gateway. You have\
+          \ full\n* access to the request and response payload, including headers\
+          \ and\n* status code.\n*\n* To scan a DynamoDB table, make a GET request\
+          \ with the TableName as a\n* query string parameter. To put, update, or\
+          \ delete an item, make a POST,\n* PUT, or DELETE request respectively, passing\
+          \ in the payload to the\n* DynamoDB API as a JSON body.\n*/\nexports.handler\
+          \ = async (event, context) => {\n    let body;\n    let statusCode = '200';\n\
+          \    const headers = {\n        'Content-Type': 'application/json',\n  \
+          \      \"Access-Control-Allow-Origin\" : \"*\", // Required for CORS support\
+          \ to work\n        \"Access-Control-Allow-Credentials\" : true // Required\
+          \ for cookies, authorization headers with HTTPS \n    };\n\n    try {\n\
+          \        switch (event.httpMethod) {\n            case 'POST':\n       \
+          \         body = await dynamo.put(JSON.parse(event.body)).promise();\n \
+          \               break;\n            default:\n                throw new\
+          \ Error(`Unsupported method \"${event.httpMethod}\"`);\n        }\n    }\
+          \ catch (err) {\n        statusCode = '400';\n        body = err.message;\n\
+          \    } finally {\n        body = JSON.stringify(body);\n    }\n    return\
+          \ {\n        statusCode,\n        body,\n        headers,\n    };\n};\n"
+      FunctionName:
+        Fn::Sub: handleInsert-${Environment}
+      Handler: index.handler
+      Role:
+        Fn::GetAtt:
+        - handleInsertRoledev
+        - Arn
+      Runtime: nodejs12.x
+    Type: AWS::Lambda::Function
+  handleInsertRoledev:
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+        Version: '2012-10-17'
+      Path: /
+      Policies:
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Effect: Allow
+            Resource: '*'
+          Version: '2012-10-17'
+        PolicyName: AWSLambdaBasicExecutionRole
+      - PolicyDocument:
+          Statement:
+          - Action:
+            - dynamodb:*
+            Effect: Allow
+            Resource:
+              Fn::Sub: arn:aws:dynamodb:ca-central-1:${AccountId}:table/${TableName}-${Environment}
+          Version: '2012-10-17'
+        PolicyName: AthlyticsDynamoAccess
+      RoleName: handleInsertRole-dev
     Type: AWS::IAM::Role
