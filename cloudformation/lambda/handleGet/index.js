@@ -192,8 +192,6 @@ function meanSquareError(athletes, percentiles, threshold) {
         let races = entry["races"];
 
         let hsRaces = races.filter(race => race.category != "university");
-        console.log(hsRaces.length);
-        console.log(percentiles.length);
         if (hsRaces.length >= percentiles.length) {
             let length = Math.min(hsRaces.length, percentiles.length);
             let sum = 0;
