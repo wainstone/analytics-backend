@@ -6,9 +6,6 @@ Parameters:
   Environment:
     Default: dev
     Type: String
-  LambdaName:
-    Default: get_all_athletes
-    Type: String
   ProjectName:
     Default: athlytics_jy75
     Type: String
@@ -17,6 +14,9 @@ Parameters:
     Type: String
   TableName:
     Default: athlytics_jy75
+    Type: String
+  LambdaBucketName:
+    Default: athlytics_jy75_lambdas
     Type: String
   ApiReadyToDeploy:
     Description: Specifies if the lambda functions are created such that the API can be deployed. 
@@ -176,3 +176,11 @@ Resources:
       TableName:
         Fn::Sub: ${TableName}-${Environment}
     Type: AWS::DynamoDB::Table
+
+# This is being commented out because the Lambda functions must be uploaded to the bucket before the stack is created since the Lambdas
+# in CloudFormation need to reference the bucket. Ie: create bucket -> upload function code -> create cloudformation (Lambdas reference the code stored in S3)
+  # lambdaBucket:
+  #   Type: AWS::S3::Bucket
+  #   Properties: 
+  #     BucketName: 
+  #       Fn::Sub: ${LambdaBucketName}

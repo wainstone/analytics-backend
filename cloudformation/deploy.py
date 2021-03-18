@@ -5,11 +5,15 @@ from time import sleep
 import yaml
 from jinja2 import Template 
 import zipfile 
+import zlib
 
 BACKEND_TEMPLATE = "./cf_backend_template.yaml"
 RENDERED_BACKEND_TEMPLATE = "./rendered_cf_backend.yaml"
 LAMBDA_TEMPLATE = "./lambda/lambda_function_template.yaml"
-LAMBDA_BUCKET = "athlytics-jy75-lambdas"
+PROJECT_PREFIX = "athlytics-jy75"
+LAMBDA_BUCKET_PREFIX = PROJECT_PREFIX + "-lambdas"
+REGION = "ca-central-1"
+
 
 def parse_template(template, cloudformation):
     with open(template) as template_fileobj:
@@ -35,14 +39,21 @@ def watchStack(cf_client, stackName):
                 print("Stack creation finished with status: " + status)
                 break
 
-def createLambdas(env):
+def createLambdaBucket(env, lambda_bucket):
+    s3_client = boto3.client("s3", region_name=REGION)
+    location = {'LocationConstraint': REGION}
+    s3_client.create_bucket(Bucket=lambda_bucket, CreateBucketConfiguration=location)
+
+def createLambdas(env, lambda_bucket):
     
     # List of each Lambda's rendered yaml 
-    lambdaYaml_list = []
+    lambda_list = []
 
     # Properties dictionary to hold information for each lambda function 
     handlePost = {
         "env": env,
+        "s3_bucket": lambda_bucket,
+        "s3_key": buildLambdaKey("./lambda/handlePost/index.js", "handlePost"),
         "lambda_name": "handlePost",
         "http_method": "POST",
         "api_resource": "athletesApiResource"
@@ -50,6 +61,8 @@ def createLambdas(env):
 
     handleGet = {
         "env": env,
+        "s3_bucket": lambda_bucket,
+        "s3_key": buildLambdaKey("./lambda/handleGet/index.js", "handleGet"),
         "lambda_name": "handleGet",
         "http_method": "GET",
         "api_resource": "athletesApiResource"
@@ -57,22 +70,31 @@ def createLambdas(env):
 
     handleAdminInsert = {
         "env": env,
+        "s3_bucket": lambda_bucket,
+        "s3_key": buildLambdaKey("./lambda/handleAdminInsert/index.js", "handleAdminInsert"),
         "lambda_name": "handleAdminInsert",
         "http_method": "ANY",
         "api_resource": "adminApiResource"
     }
 
-    # lambdaYaml_list.append(buildLambda(handleGet))
-    lambdaYaml_list.append(buildLambda(handlePost))
-    # lambdaYaml_list.append(buildLambda(handleAdminInsert))        
+    lambda_list.append({ "yaml": buildLambda(handleGet), "properties": handleGet})
+    lambda_list.append({ "yaml": buildLambda(handlePost), "properties": handlePost})
+    lambda_list.append({ "yaml": buildLambda(handleAdminInsert), "properties": handleAdminInsert})        
 
-    appendLambdas(lambdaYaml_list)
+    appendLambdas(list(map(lambda x: x["yaml"], lambda_list)))
 
-    zipf = zipfile.ZipFile('./lambda/' + handlePost["lambda_name"] + '.zip', 'w', zipfile.ZIP_DEFLATED)
-    zipLambda('./lambda/' + handlePost["lambda_name"], zipf)
-    zipf.close()
+    try:
+        uploadLambas(lambda_list, lambda_bucket)
+    except:
+        raise
+    
+# Needed for Lambda to pull new code after changes
+def buildLambdaKey(path, name):
+    with open(path) as f:
+        crc = zlib.crc32(bytes(f.read(), 'utf-8'))
+        print(name + "-" + str(crc))
+        return name + "-" + str(crc)
 
-    uploadLambdaZip('./lambda/' + handlePost["lambda_name"] + '.zip', handlePost["lambda_name"])
 
 def zipLambda(path, ziph):
     # ziph is zipfile handle
@@ -80,31 +102,34 @@ def zipLambda(path, ziph):
         for file in files:
             ziph.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), os.path.join(path, '..')))
 
-def uploadLambdaZip(path, name):
-    s3_client = boto3.client("s3")
+def uploadLambas(lambda_list, lambda_bucket):
+    for l in lambda_list:
+        name = l["properties"]["lambda_name"]
+        zipf = zipfile.ZipFile('./lambda/' + name + '.zip', 'w', zipfile.ZIP_DEFLATED)
+        zipLambda('./lambda/' + name, zipf)
+        zipf.close()
 
+        try:
+            uploadLambdaZip('./lambda/' + name + '.zip', l["properties"]["s3_key"], lambda_bucket)
+        except:
+            raise
+
+# Uploads Lambda zips to the specified bucket
+def uploadLambdaZip(path, name, lambda_bucket):
+    s3_client = boto3.client("s3")
     try:
-        response = s3_client.upload_file(path, LAMBDA_BUCKET, name)
-        print(response)
-    except Exception as e:
-        print(e)
+        s3_client.upload_file(path, lambda_bucket, name)
+    except:
+        raise
 
       
-
-
 # Uses a property dictionary render a new Lambda function as CloudFormation
-def buildLambda(lambda_properties):
-
-    with open(os.getcwd() + "/lambda/" + lambda_properties["lambda_name"] + "/index.js", "rb") as code:
-            # code_string = code.read()
-            # lambda_properties["code"] = code_string.decode("UTF-8")
-            lambda_properties["s3_bucket"] = LAMBDA_BUCKET
-            lambda_properties["s3_key"] = lambda_properties["lambda_name"]
+def buildLambda(lambda_properties):            
     with open(LAMBDA_TEMPLATE, "rb") as yamlfile:
-            template_string = yamlfile.read()
-            template = Template(template_string.decode("UTF-8"))
-            rendered = template.render(lambda_properties)
-            return yaml.safe_load(rendered)
+        template_string = yamlfile.read()
+        template = Template(template_string.decode("UTF-8"))
+        rendered = template.render(lambda_properties)
+        return yaml.safe_load(rendered)
     
 
 # appendLambdas will append the rendered lambda cloudformation files to the actual backend template 
@@ -145,19 +170,35 @@ def main():
     parser.add_argument('--env', type=str, required=True, help='The environment to deploy the stack to. Choose your name if unsure.')
     args = parser.parse_args()
 
-    # Build lambda functions from their JS files and append to the CF template
-    createLambdas(args.env)
+    # Create bucket to hold lambda functions 
+    lambda_bucket = LAMBDA_BUCKET_PREFIX + "-" + args.env
+    try:
+        createLambdaBucket(args.env, lambda_bucket)
+    except Exception as e:
+        if "BucketAlreadyOwnedByYou" not in str(e):
+            print(e)
+            exit(1)
 
-    stack_name = 'athlytics-jy75-' + args.env
+    # Create Lambda CloudFormation and upload the code 
+    try:
+        createLambdas(args.env, lambda_bucket)
+    except Exception as e:
+        print(e)
+        exit(1)
+
+    stack_name = PROJECT_PREFIX + '-' + args.env
     cf_client = boto3.client('cloudformation')
     
     templateBody = parse_template(RENDERED_BACKEND_TEMPLATE, cf_client)
 
+    # Do a two stage deployment to first create the base api and other resources
     parameters = [
                 {"ParameterKey": "Environment", "ParameterValue": args.env},
-                {"ParameterKey": "ApiReadyToDeploy", "ParameterValue": "false"}]
+                {"ParameterKey": "ApiReadyToDeploy", "ParameterValue": "false"},
+                {"ParameterKey": "LambdaBucketName", "ParameterValue": lambda_bucket}]
     deployStack(cf_client, stack_name, templateBody, parameters)
 
+    # Now create the API methods and deploy it
     print("Lambda functions created, now deploying with respective API methods.")
     parameters[1]["ParameterValue"] = "true"
     deployStack(cf_client, stack_name, templateBody, parameters)
