@@ -44,6 +44,11 @@ def createLambdaBucket(env, lambda_bucket):
     location = {'LocationConstraint': REGION}
     s3_client.create_bucket(Bucket=lambda_bucket, CreateBucketConfiguration=location)
 
+def emptyLambdaBucket(lambda_bucket):
+    s3_resource = boto3.resource('s3')
+    bucket = s3_resource.Bucket(lambda_bucket)
+    bucket.objects.all().delete()
+
 def createLambdas(env, lambda_bucket):
     
     # List of each Lambda's rendered yaml 
@@ -175,7 +180,10 @@ def main():
     try:
         createLambdaBucket(args.env, lambda_bucket)
     except Exception as e:
-        if "BucketAlreadyOwnedByYou" not in str(e):
+        if "BucketAlreadyOwnedByYou" in str(e):
+            # Empty the previous functions in the bucket
+            emptyLambdaBucket(lambda_bucket)
+        else:
             print(e)
             exit(1)
 
