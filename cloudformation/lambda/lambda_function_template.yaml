@@ -69,8 +69,8 @@
   Type: AWS::Lambda::Function
   Properties: 
     Code: 
-      ZipFile: |
-        {{ code | indent(8)}}
+      S3Bucket: "{{ s3_bucket }}"
+      S3Key: "{{ s3_key }}"
     FunctionName: 
       Fn::Sub: "{{ lambda_name }}-${Environment}"
     Handler: "index.handler"

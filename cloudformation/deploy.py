@@ -4,10 +4,12 @@ import argparse
 from time import sleep
 import yaml
 from jinja2 import Template 
+import zipfile 
 
 BACKEND_TEMPLATE = "./cf_backend_template.yaml"
 RENDERED_BACKEND_TEMPLATE = "./rendered_cf_backend.yaml"
 LAMBDA_TEMPLATE = "./lambda/lambda_function_template.yaml"
+LAMBDA_BUCKET = "athlytics-jy75-lambdas"
 
 def parse_template(template, cloudformation):
     with open(template) as template_fileobj:
@@ -39,9 +41,9 @@ def createLambdas(env):
     lambdaYaml_list = []
 
     # Properties dictionary to hold information for each lambda function 
-    handleInsert = {
+    handlePost = {
         "env": env,
-        "lambda_name": "handleInsert",
+        "lambda_name": "handlePost",
         "http_method": "POST",
         "api_resource": "athletesApiResource"
     }
@@ -60,18 +62,44 @@ def createLambdas(env):
         "api_resource": "adminApiResource"
     }
 
-    lambdaYaml_list.append(buildLambda(handleGet))
-    lambdaYaml_list.append(buildLambda(handleInsert))
-    lambdaYaml_list.append(buildLambda(handleAdminInsert))
+    # lambdaYaml_list.append(buildLambda(handleGet))
+    lambdaYaml_list.append(buildLambda(handlePost))
+    # lambdaYaml_list.append(buildLambda(handleAdminInsert))        
 
     appendLambdas(lambdaYaml_list)
+
+    zipf = zipfile.ZipFile('./lambda/' + handlePost["lambda_name"] + '.zip', 'w', zipfile.ZIP_DEFLATED)
+    zipLambda('./lambda/' + handlePost["lambda_name"], zipf)
+    zipf.close()
+
+    uploadLambdaZip('./lambda/' + handlePost["lambda_name"] + '.zip', handlePost["lambda_name"])
+
+def zipLambda(path, ziph):
+    # ziph is zipfile handle
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            ziph.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), os.path.join(path, '..')))
+
+def uploadLambdaZip(path, name):
+    s3_client = boto3.client("s3")
+
+    try:
+        response = s3_client.upload_file(path, LAMBDA_BUCKET, name)
+        print(response)
+    except Exception as e:
+        print(e)
+
+      
+
 
 # Uses a property dictionary render a new Lambda function as CloudFormation
 def buildLambda(lambda_properties):
 
     with open(os.getcwd() + "/lambda/" + lambda_properties["lambda_name"] + "/index.js", "rb") as code:
-            code_string = code.read()
-            lambda_properties["code"] = code_string.decode("UTF-8")
+            # code_string = code.read()
+            # lambda_properties["code"] = code_string.decode("UTF-8")
+            lambda_properties["s3_bucket"] = LAMBDA_BUCKET
+            lambda_properties["s3_key"] = lambda_properties["lambda_name"]
     with open(LAMBDA_TEMPLATE, "rb") as yamlfile:
             template_string = yamlfile.read()
             template = Template(template_string.decode("UTF-8"))
