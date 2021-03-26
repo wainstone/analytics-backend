@@ -50,7 +50,6 @@ def emptyLambdaBucket(lambda_bucket):
     bucket.objects.all().delete()
 
 def createLambdas(env, lambda_bucket):
-    
     # List of each Lambda's rendered yaml 
     lambda_list = []
 
@@ -97,22 +96,15 @@ def createLambdas(env, lambda_bucket):
 def buildLambdaKey(path, name):
     with open(path) as f:
         crc = zlib.crc32(bytes(f.read(), 'utf-8'))
-        print(name + "-" + str(crc))
         return name + "-" + str(crc)
 
-
-def zipLambda(path, ziph):
-    # ziph is zipfile handle
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            ziph.write(os.path.join(root, file), os.path.relpath(os.path.join(root, file), os.path.join(path, '..')))
-
 def uploadLambas(lambda_list, lambda_bucket):
+    print("Uploading Lambdas to " + lambda_bucket)
     for l in lambda_list:
         name = l["properties"]["lambda_name"]
-        zipf = zipfile.ZipFile('./lambda/' + name + '.zip', 'w', zipfile.ZIP_DEFLATED)
-        zipLambda('./lambda/' + name, zipf)
-        zipf.close()
+
+        with zipfile.ZipFile('./lambda/' + name + '.zip', 'w', zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write('lambda/' + name + "/index.js", "index.js")
 
         try:
             uploadLambdaZip('./lambda/' + name + '.zip', l["properties"]["s3_key"], lambda_bucket)
@@ -120,10 +112,10 @@ def uploadLambas(lambda_list, lambda_bucket):
             raise
 
 # Uploads Lambda zips to the specified bucket
-def uploadLambdaZip(path, name, lambda_bucket):
+def uploadLambdaZip(path, s3_key, lambda_bucket):
     s3_client = boto3.client("s3")
     try:
-        s3_client.upload_file(path, lambda_bucket, name)
+        s3_client.upload_file(path, lambda_bucket, s3_key)
     except:
         raise
 
@@ -139,6 +131,7 @@ def buildLambda(lambda_properties):
 
 # appendLambdas will append the rendered lambda cloudformation files to the actual backend template 
 def appendLambdas(lambdaYaml_list):
+    print("Appending Lambdas to CloudFormation...")
     with open(BACKEND_TEMPLATE, "r") as yamlfile:
         curr_yaml = yaml.safe_load(yamlfile)
 
