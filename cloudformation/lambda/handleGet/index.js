@@ -49,7 +49,19 @@ exports.handler = async (event, context) => {
     };
 
     try {
-        let command = parseInt(event.queryStringParameters.command);
+        if (event.queryStringParameters == undefined) {
+            throw "no query string parameters were given"
+        }
+        let command = event.queryStringParameters.command;
+        if (command == undefined) {
+            throw "command not given"
+        }
+        command = parseInt(command);
+        if (isNaN(command)) {
+            throw "given command was not a number";
+        }
+        console.log("Received command " + command);
+        
         switch (command) {
             case 1:
                 var percentiles = event.queryStringParameters.percentiles.split(",").map(x => parseFloat(x));
@@ -92,11 +104,11 @@ exports.handler = async (event, context) => {
                 break;
             default:
                 statusCode = '400';
-                throw new Error(`Unsupported method "${event.httpMethod}"`);
+                throw new Error(`Unsupported method`);
         }
-
-        
     } catch (err) {
+        statusCode = '400';
+        console.log("ERROR CAUGHT: " + err)
         body = err;
     } finally {
         body = JSON.stringify(body);
