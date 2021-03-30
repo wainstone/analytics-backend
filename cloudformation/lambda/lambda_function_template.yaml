@@ -77,3 +77,5 @@
     Role:
       Fn::GetAtt: ["{{ lambda_name }}Role{{ env }}", "Arn"]
     Runtime: nodejs12.x
+    Timeout: 60
+    MemorySize: 500
