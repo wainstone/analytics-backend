@@ -1,7 +1,7 @@
 const AWS = require('aws-sdk');
 const dynamo = new AWS.DynamoDB.DocumentClient();
 
-let TABLENAME = "athlytics_jy75-ben";
+let TABLENAME = "athlytics_jy75-dev";
 
 /**
 * Demonstrates a simple HTTP endpoint using API Gateway. You have full

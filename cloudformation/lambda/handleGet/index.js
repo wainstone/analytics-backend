@@ -77,8 +77,7 @@ exports.handler = async (event, context) => {
                 break;
             case 3:
                 var params = { TableName: TABLENAME };
-                if (event.queryStringParameters.name || event.queryStringParameters.gender || event.queryStringParameters.province ||
-                   event.queryStringParameters.splace || event.queryStringParameters.eplace) {
+                if (event.queryStringParameters.name || event.queryStringParameters.gender) {
                        params.ExpressionAttributeNames = {};
                        params.ExpressionAttributeValues = {};
                        params.FilterExpression = "";
@@ -199,6 +198,7 @@ function meanSquareError(athletes, percentiles, threshold) {
         throw "threshold not given";
     }
     let similar = [];
+
     athletes.forEach(entry => {
         let athlete = entry["athlete"];
         let races = entry["races"];
