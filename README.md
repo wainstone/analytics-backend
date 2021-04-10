@@ -2,8 +2,10 @@
 
 
 ## Deployment
-`cd cloudformation
-python deploy.py --env <your environment here>`
+```
+cd cloudformation
+python deploy.py --env <your environment here>
+```
 
 Ex: 
 `python deploy.py --env dev`
