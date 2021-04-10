@@ -79,3 +79,7 @@
     Runtime: nodejs12.x
     Timeout: 60
     MemorySize: 500
+    Environment:
+      Variables:
+        ANALYSIS_ATHLETES_TABLE: athlytics_jy75-{{ env }} # This and the below should be changed once we have two databases 
+        PROSPECTIVE_ATHLETES_TABLE: athlytics_jy75-{{ env }} 

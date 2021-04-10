@@ -1,7 +1,7 @@
 const AWS = require('aws-sdk');
 
 const dynamo = new AWS.DynamoDB.DocumentClient();
-const TABLENAME = "athlytics_jy75-dev"; // this should be converted to an env variable
+const TABLENAME = process.env.ANALYSIS_ATHLETES_TABLE;
 
 
 async function filterAthletes(queryParams, athletes) {
@@ -198,28 +198,45 @@ function meanSquareError(athletes, percentiles, threshold) {
         throw "threshold not given";
     }
     let similar = [];
-
-    athletes.forEach(entry => {
-        let athlete = entry["athlete"];
-        let races = entry["races"];
+    for (let i = 0; i < athletes.length; i++) {
+        let athlete = athletes[i]["athlete"];
+        let races = athletes[i]["races"];
+        let insideThreshold = true;
 
         let hsRaces = races.filter(race => race.category != "university");
         if (hsRaces.length >= percentiles.length) {
             let length = Math.min(hsRaces.length, percentiles.length);
             let sum = 0;
             for (let i = 0; i < length; i++) {
+                if (Math.abs(hsRaces[i].percentile - percentiles[i]) > threshold) {
+                    insideThreshold = false;
+                    break;
+                }
                 sum += Math.pow((hsRaces[i].percentile - percentiles[i]), 2)
             }
             let mse = sum / length;
             
-            similar.push({ 'athlete': athlete, 'races': races, 'mse': mse});
+            if (insideThreshold) {
+                similar.push({ 'athlete': athlete, 'races': races, 'mse': mse});
+            }
         }
-    });
-    similar.sort((a, b) => a.mse - b.mse);
-
-    let topAthletes = [];
-    for (let i = 0; i < Math.min(threshold, similar.length); i++) {
-        topAthletes.push(similar[i]);
     }
-    return topAthletes;
+    // athletes.forEach(entry => {
+    //     let athlete = entry["athlete"];
+    //     let races = entry["races"];
+
+    //     let hsRaces = races.filter(race => race.category != "university");
+    //     if (hsRaces.length >= percentiles.length) {
+    //         let length = Math.min(hsRaces.length, percentiles.length);
+    //         let sum = 0;
+    //         for (let i = 0; i < length; i++) {
+    //             sum += Math.pow((hsRaces[i].percentile - percentiles[i]), 2)
+    //         }
+    //         let mse = sum / length;
+            
+    //         similar.push({ 'athlete': athlete, 'races': races, 'mse': mse});
+    //     }
+    // });
+    similar.sort((a, b) => a.mse - b.mse);
+    return similar;
 }

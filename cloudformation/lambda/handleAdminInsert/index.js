@@ -1,7 +1,7 @@
 const AWS = require('aws-sdk');
 
 const dynamo = new AWS.DynamoDB.DocumentClient();
-const TABLENAME = "athlytics_jy75-dev"; // this should be converted to an env variable
+const TABLENAME = process.env.ANALYSIS_ATHLETES_TABLE;
 
 
 async function filterAthletes(queryParams, athletes) {
