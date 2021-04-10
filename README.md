@@ -10,6 +10,8 @@ python deploy.py --env <your environment here>
 Ex: 
 `python deploy.py --env dev`
 
+### How it works
+The script performs the following in order
 1. Create Lambda function bucket
 2. Lambda functions are Zipped and uploaded to the bucket
 3. CloudFormation is deployed in two stages:
