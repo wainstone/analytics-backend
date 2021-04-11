@@ -67,6 +67,8 @@ exports.handler = async (event, context) => {
                 var percentiles = event.queryStringParameters.percentiles.split(",").map(x => parseFloat(x));
                 var threshold = event.queryStringParameters.threshold;
                 var params = { TableName: TABLENAME };
+                params.ExpressionAttributeNames = {};
+                params.ExpressionAttributeValues = {};
                 params.ExpressionAttributeNames["#gender"] = "gender";
                 params.ExpressionAttributeValues[":gender"] = event.queryStringParameters.gender;
                 params.FilterExpression = "#gender = :gender";
@@ -77,6 +79,8 @@ exports.handler = async (event, context) => {
                 var percentiles = event.queryStringParameters.percentiles.split(",").map(x => parseFloat(x));
                 var numAthletes = event.queryStringParameters.threshold;
                 var params = { TableName: TABLENAME };
+                params.ExpressionAttributeNames = {};
+                params.ExpressionAttributeValues = {};
                 params.ExpressionAttributeNames["#gender"] = "gender";
                 params.ExpressionAttributeValues[":gender"] = event.queryStringParameters.gender;
                 params.FilterExpression = "#gender = :gender";
@@ -230,6 +234,7 @@ function meanSquareError(athletes, percentiles, threshold) {
             }
         }
     }
+
     similar.sort((a, b) => a.mse - b.mse);
     return similar;
 }
