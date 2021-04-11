@@ -66,13 +66,21 @@ exports.handler = async (event, context) => {
             case 1:
                 var percentiles = event.queryStringParameters.percentiles.split(",").map(x => parseFloat(x));
                 var threshold = event.queryStringParameters.threshold;
-                var data = await dynamo.scan({ TableName: TABLENAME }).promise();
+                var params = { TableName: TABLENAME };
+                params.ExpressionAttributeNames["#gender"] = "gender";
+                params.ExpressionAttributeValues[":gender"] = event.queryStringParameters.gender;
+                params.FilterExpression = "#gender = :gender";
+                var data = await dynamo.scan(params).promise();
                 body = meanSquareError(data["Items"], percentiles, threshold);
                 break;
             case 2: 
                 var percentiles = event.queryStringParameters.percentiles.split(",").map(x => parseFloat(x));
                 var numAthletes = event.queryStringParameters.threshold;
-                var data = await dynamo.scan({ TableName: TABLENAME }).promise();
+                var params = { TableName: TABLENAME };
+                params.ExpressionAttributeNames["#gender"] = "gender";
+                params.ExpressionAttributeValues[":gender"] = event.queryStringParameters.gender;
+                params.FilterExpression = "#gender = :gender";
+                var data = await dynamo.scan(params).promise();
                 body = findPlacers(data["Items"], percentiles, 5, numAthletes);
                 break;
             case 3:
@@ -201,6 +209,7 @@ function meanSquareError(athletes, percentiles, threshold) {
     for (let i = 0; i < athletes.length; i++) {
         let athlete = athletes[i]["athlete"];
         let races = athletes[i]["races"];
+        let gender = athletes[i]["gender"];
         let insideThreshold = true;
 
         let hsRaces = races.filter(race => race.category != "university");
@@ -217,26 +226,10 @@ function meanSquareError(athletes, percentiles, threshold) {
             let mse = sum / length;
             
             if (insideThreshold) {
-                similar.push({ 'athlete': athlete, 'races': races, 'mse': mse});
+                similar.push({ 'athlete': athlete, 'gender': gender, 'races': races, 'mse': mse});
             }
         }
     }
-    // athletes.forEach(entry => {
-    //     let athlete = entry["athlete"];
-    //     let races = entry["races"];
-
-    //     let hsRaces = races.filter(race => race.category != "university");
-    //     if (hsRaces.length >= percentiles.length) {
-    //         let length = Math.min(hsRaces.length, percentiles.length);
-    //         let sum = 0;
-    //         for (let i = 0; i < length; i++) {
-    //             sum += Math.pow((hsRaces[i].percentile - percentiles[i]), 2)
-    //         }
-    //         let mse = sum / length;
-            
-    //         similar.push({ 'athlete': athlete, 'races': races, 'mse': mse});
-    //     }
-    // });
     similar.sort((a, b) => a.mse - b.mse);
     return similar;
 }
