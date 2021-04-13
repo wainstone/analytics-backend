@@ -78,6 +78,7 @@ exports.handler = async (event, context) => {
             case 2: 
                 var percentiles = event.queryStringParameters.percentiles.split(",").map(x => parseFloat(x));
                 var numAthletes = event.queryStringParameters.threshold;
+                var threshold = event.queryStringParameters.threshold;
                 var params = { TableName: TABLENAME };
                 params.ExpressionAttributeNames = {};
                 params.ExpressionAttributeValues = {};
@@ -85,7 +86,7 @@ exports.handler = async (event, context) => {
                 params.ExpressionAttributeValues[":gender"] = event.queryStringParameters.gender;
                 params.FilterExpression = "#gender = :gender";
                 var data = await dynamo.scan(params).promise();
-                body = findPlacers(data["Items"], percentiles, 5, numAthletes);
+                body = findPlacers(data["Items"], percentiles, threshold);
                 break;
             case 3:
                 var params = { TableName: TABLENAME };
@@ -131,16 +132,13 @@ exports.handler = async (event, context) => {
     };
 };
 
-function findPlacers(athletes, percentiles, threshold, numAthletes) {
+function findPlacers(athletes, percentiles, threshold) {
     let seeds = {}; // Uni athletes who passed the placement test. Used to get eligible athletes.
     if (percentiles.length != 2) {
         throw "list of percentiles is not length 2"
     }
     if (threshold == undefined) {
         throw "threshold not given"
-    }
-    if (numAthletes == undefined) {
-        throw "numAthletes not given"
     }
     let low = Math.min(...percentiles);
     let high = Math.max(...percentiles);
@@ -177,7 +175,27 @@ function findPlacers(athletes, percentiles, threshold, numAthletes) {
     // Since intermediate might contain duplicate athletes (because two seed athletes could find the same athlete as similar), average their MSE's
     let averaged = averageMses(intermediate);
     averaged.sort((a,b) => a.mse - b.mse);
-    return averaged.slice(0, numAthletes) // Let the frontend do the rest of the filtering on this set
+    return getEligible(averaged);
+}
+
+// This function filters the passed list of athletes to only contain athletes we consider eligible for recruitment
+function getEligible(athletes) {
+    // We check if the athlete has raced in the last 5 years (indicating that they still have time to compete at UBC)
+    let currYear = new Date().getFullYear();
+    let eligible = [];
+    for (let i = 0; i < athletes.length; i++) {
+        let curr = athletes[i];
+        let isEligible = false;
+        curr.races.forEach((race) => {
+            if (currYear - race.year < 5) {
+                isEligible = true;
+            }
+        });
+        if (isEligible) {
+            eligible.push(curr);
+        }
+    }
+    return eligible;
 }
 
 // Helper function for findPlacers. Returns the averaged MSEs of the intermediate list of similar athletes.
@@ -196,8 +214,8 @@ function averageMses(intermediate) {
         }
     });
     Object.values(unique).forEach(entry => {
-        averagedList.push({'athlete': entry.athlete, 'races': entry.races, 'mse': (entry.mses.reduce((a, b) => a + b) / entry.mses.length)})
-    })
+        averagedList.push({'athlete': entry.athlete,'gender': entry.gender, 'races': entry.races, 'mse': (entry.mses.reduce((a, b) => a + b) / entry.mses.length)});
+    });
     
     return averagedList;
 }
@@ -234,7 +252,6 @@ function meanSquareError(athletes, percentiles, threshold) {
             }
         }
     }
-
     similar.sort((a, b) => a.mse - b.mse);
     return similar;
 }
