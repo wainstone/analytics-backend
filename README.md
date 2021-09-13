@@ -1,5 +1,6 @@
 # analytics-backend
 
+Backend repository for AWS infra-as-code for Athlytics UBC capstone project.
 
 ## Deployment
 ```
